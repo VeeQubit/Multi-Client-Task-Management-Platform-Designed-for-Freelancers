@@ -23,12 +23,12 @@ export const StatCards: React.FC = () => {
   const dueTodayTasks = tasks.filter(t => t.dueDate === todayStr && t.status !== 'done').length;
   const overdueTasks = tasks.filter(t => t.dueDate < todayStr && t.status !== 'done').length;
 
-  const totalSecondsTracked = timeEntries.reduce((acc, curr) => acc + curr.durationSeconds, 0);
+  const totalSecondsTracked = timeEntries.reduce((acc, curr) => acc + (curr.durationSeconds || 0), 0);
   const totalHoursTracked = (totalSecondsTracked / 3600).toFixed(1);
 
   const unbilledEntries = timeEntries.filter(t => !t.isBilled && t.isBillable);
   const unbilledEarnings = unbilledEntries.reduce(
-    (acc, curr) => acc + Math.round((curr.durationSeconds / 3600) * curr.hourlyRate),
+    (acc, curr) => acc + Math.round(((curr.durationSeconds || 0) / 3600) * (curr.hourlyRate || 0)),
     0
   );
 

@@ -33,14 +33,18 @@ export const RecentActivity: React.FC = () => {
     type: 'time',
   }));
 
-  const recentInvoicesList = invoices.slice(0, 2).map(inv => ({
-    id: `act-inv-${inv.id}`,
-    title: `Invoice ${inv.invoiceNumber} (${inv.currency}${inv.total.toLocaleString()}) ${inv.status}`,
-    sub: inv.clientCompany,
-    time: inv.issueDate,
-    icon: <FileText className="w-4 h-4 text-amber-600" />,
-    type: 'invoice',
-  }));
+  const recentInvoicesList = invoices.slice(0, 2).map(inv => {
+    const totalVal = (inv.total ?? (inv as any).totalAmount ?? 0);
+    const curr = inv.currency || '$';
+    return {
+      id: `act-inv-${inv.id}`,
+      title: `Invoice ${inv.invoiceNumber} (${curr}${totalVal.toLocaleString()}) ${inv.status}`,
+      sub: inv.clientCompany || inv.clientName || 'Client',
+      time: inv.issueDate,
+      icon: <FileText className="w-4 h-4 text-amber-600" />,
+      type: 'invoice',
+    };
+  });
 
   const combinedActivities = [
     ...completedTasksList,

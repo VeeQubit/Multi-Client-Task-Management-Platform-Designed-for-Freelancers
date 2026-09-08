@@ -33,20 +33,27 @@ export const InvoiceListView: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const filteredInvoices = invoices.filter(inv => {
+    const invNum = inv.invoiceNumber || '';
+    const comp = inv.clientCompany || '';
+    const cName = inv.clientName || '';
+    const q = search.toLowerCase();
+
     const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.clientCompany.toLowerCase().includes(search.toLowerCase()) ||
-      inv.clientName.toLowerCase().includes(search.toLowerCase());
+      invNum.toLowerCase().includes(q) ||
+      comp.toLowerCase().includes(q) ||
+      cName.toLowerCase().includes(q);
 
     const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.total, 0);
+  const getInvTotal = (i: Invoice) => (i.total ?? (i as any).totalAmount ?? 0);
+
+  const totalInvoiced = invoices.reduce((acc, curr) => acc + getInvTotal(curr), 0);
   const paidInvoices = invoices.filter(i => i.status === 'paid');
-  const totalPaid = paidInvoices.reduce((acc, curr) => acc + curr.total, 0);
+  const totalPaid = paidInvoices.reduce((acc, curr) => acc + getInvTotal(curr), 0);
   const pendingInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
-  const totalPending = pendingInvoices.reduce((acc, curr) => acc + curr.total, 0);
+  const totalPending = pendingInvoices.reduce((acc, curr) => acc + getInvTotal(curr), 0);
 
   const handleEdit = (inv: Invoice) => {
     setSelectedInvoiceForEdit(inv);
@@ -248,7 +255,7 @@ export const InvoiceListView: React.FC = () => {
                   <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">{inv.dueDate}</td>
 
                   <td className="py-3.5 px-4 font-mono font-black text-slate-900 dark:text-white text-sm">
-                    {inv.currency}{inv.total.toLocaleString()}
+                    {inv.currency || '$'}{getInvTotal(inv).toLocaleString()}
                   </td>
 
                   <td className="py-3.5 px-4 text-right">

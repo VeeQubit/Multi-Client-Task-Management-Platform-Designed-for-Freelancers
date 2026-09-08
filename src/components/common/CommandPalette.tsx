@@ -271,7 +271,7 @@ export const CommandPalette: React.FC = () => {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <FileText className="w-4 h-4 text-amber-600 shrink-0" />
                     <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                      {inv.invoiceNumber} — {inv.clientCompany} (${inv.total.toLocaleString()})
+                      {inv.invoiceNumber} — {inv.clientCompany || inv.clientName || 'Client'} (${((inv.total ?? (inv as any).totalAmount) ?? 0).toLocaleString()})
                     </span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />

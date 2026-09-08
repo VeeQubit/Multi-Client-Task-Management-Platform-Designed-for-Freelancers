@@ -55,11 +55,11 @@ export const TimeTrackerView: React.FC = () => {
   };
 
   // Simple, intuitive metrics
-  const totalSeconds = timeEntries.reduce((acc, curr) => acc + curr.durationSeconds, 0);
+  const totalSeconds = timeEntries.reduce((acc, curr) => acc + (curr.durationSeconds || 0), 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);
 
   const totalEarned = timeEntries.reduce(
-    (acc, curr) => acc + Math.round((curr.durationSeconds / 3600) * curr.hourlyRate),
+    (acc, curr) => acc + Math.round(((curr.durationSeconds || 0) / 3600) * (curr.hourlyRate || 0)),
     0
   );
 
@@ -298,8 +298,10 @@ export const TimeTrackerView: React.FC = () => {
               {timeEntries.map(entry => {
                 const client = clients.find(c => c.id === entry.clientId);
                 const project = projects.find(p => p.id === entry.projectId);
-                const hoursNum = (entry.durationSeconds / 3600).toFixed(2);
-                const entryTotal = Math.round(Number(hoursNum) * entry.hourlyRate);
+                const secs = entry.durationSeconds || 0;
+                const rate = entry.hourlyRate || 0;
+                const hoursNum = (secs / 3600).toFixed(2);
+                const entryTotal = Math.round(Number(hoursNum) * rate);
 
                 return (
                   <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -325,7 +327,7 @@ export const TimeTrackerView: React.FC = () => {
                     </td>
 
                     <td className="py-3 px-4 font-bold text-emerald-700 dark:text-emerald-400">
-                      {user?.currency || '$'}{entryTotal.toLocaleString()}
+                      {user?.currency || '$'}{(entryTotal ?? 0).toLocaleString()}
                     </td>
 
                     <td className="py-3 px-4 text-right">
