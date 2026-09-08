@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -p \"[{name}]\" -n \"Vite,API\" -c \"cyan.bold,green.bold\" \"vite\" \"node server/src/server.js\"",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"Vite,API\" -c \"cyan.bold,green.bold\" \"vite\" \"node --watch server/src/server.js\"",
     "client": "vite",
-    "server": "node server/src/server.js",
+    "server": "node --watch server/src/server.js",
     "build": "tsc -b && vite build",
     "test": "node server/test-auth.js",
     "lint": "oxlint",

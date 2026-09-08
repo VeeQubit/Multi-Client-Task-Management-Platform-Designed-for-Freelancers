@@ -288,6 +288,50 @@ async function runAuthTestSuite() {
     }
   });
 
+  // --- Test 15: Invoices, Tasks, Projects Clean Slate for Real Users ---
+  await test('Verify newly registered user starts with 0 invoices, 0 tasks, 0 projects (Clean Slate)', async () => {
+    const freshUserId = `usr-fresh-${Date.now()}`;
+    const [invRes, taskRes, projRes, timeRes] = await Promise.all([
+      fetch(`${BASE}/invoices?userId=${freshUserId}`),
+      fetch(`${BASE}/tasks?userId=${freshUserId}`),
+      fetch(`${BASE}/projects?userId=${freshUserId}`),
+      fetch(`${BASE}/time-entries?userId=${freshUserId}`),
+    ]);
+
+    const invoices = await invRes.json();
+    const tasks = await taskRes.json();
+    const projects = await projRes.json();
+    const timeEntries = await timeRes.json();
+
+    if (invoices.length !== 0) throw new Error(`Expected 0 invoices, got ${invoices.length}`);
+    if (tasks.length !== 0) throw new Error(`Expected 0 tasks, got ${tasks.length}`);
+    if (projects.length !== 0) throw new Error(`Expected 0 projects, got ${projects.length}`);
+    if (timeEntries.length !== 0) throw new Error(`Expected 0 time entries, got ${timeEntries.length}`);
+  });
+
+  // --- Test 16: Demo Invoices & Seed Data Blocked from Real User Accounts ---
+  await test('Verify demo seed invoices cannot leak into real user workspace', async () => {
+    const realUserId = `usr-real-${Date.now()}`;
+    const postDemoInv = await fetch(`${BASE}/invoices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: realUserId,
+        id: 'inv-101',
+        invoiceNumber: 'INV-2026-001',
+        clientName: 'Sarah Jenkins',
+        clientCompany: 'Nova Brand Studio',
+        total: 3200,
+      }),
+    });
+
+    const getInv = await fetch(`${BASE}/invoices?userId=${realUserId}`);
+    const realUserInvoices = await getInv.json();
+    if (realUserInvoices.length !== 0) {
+      throw new Error(`Demo seed invoice was incorrectly returned for real user! Found: ${realUserInvoices.length}`);
+    }
+  });
+
   console.log(`\n${colors.bold}------------------------------------------------------${colors.reset}`);
   console.log(`  ${colors.bold}SUMMARY:${colors.reset} Total: ${passed + failed} | Passed: ${colors.green}${passed}${colors.reset} | Failed: ${colors.red}${failed}${colors.reset}`);
   console.log(`${colors.bold}------------------------------------------------------${colors.reset}\n`);

@@ -7,6 +7,7 @@ import {
   saveCollection,
   resetDbToSeed,
   getDeterministicUserId,
+  isDemoSeedEntity,
 } from './db.js';
 
 const app = express();
@@ -227,6 +228,10 @@ app.get('/api/clients', (req, res) => {
 app.post('/api/clients', (req, res) => {
   const newClientData = req.body;
   const userId = newClientData.userId || getReqUserId(req) || 'usr-1';
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  if (!isDemo && isDemoSeedEntity(newClientData)) {
+    return res.status(200).json({ ...newClientData, ignored: true });
+  }
   const clients = getCollection('clients');
   const newClient = {
     ...newClientData,
@@ -275,6 +280,10 @@ app.get('/api/projects', (req, res) => {
 app.post('/api/projects', (req, res) => {
   const newProjectData = req.body;
   const userId = newProjectData.userId || getReqUserId(req) || 'usr-1';
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  if (!isDemo && isDemoSeedEntity(newProjectData)) {
+    return res.status(200).json({ ...newProjectData, ignored: true });
+  }
   const projects = getCollection('projects');
   const newProject = {
     ...newProjectData,
@@ -324,6 +333,10 @@ app.get('/api/tasks', (req, res) => {
 app.post('/api/tasks', (req, res) => {
   const newTaskData = req.body;
   const userId = newTaskData.userId || getReqUserId(req) || 'usr-1';
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  if (!isDemo && isDemoSeedEntity(newTaskData)) {
+    return res.status(200).json({ ...newTaskData, ignored: true });
+  }
   const tasks = getCollection('tasks');
   const newTask = {
     ...newTaskData,
@@ -374,6 +387,10 @@ app.get('/api/time-entries', (req, res) => {
 app.post('/api/time-entries', (req, res) => {
   const newEntryData = req.body;
   const userId = newEntryData.userId || getReqUserId(req) || 'usr-1';
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  if (!isDemo && isDemoSeedEntity(newEntryData)) {
+    return res.status(200).json({ ...newEntryData, ignored: true });
+  }
   const timeEntries = getCollection('timeEntries');
   const newEntry = {
     ...newEntryData,
@@ -409,6 +426,10 @@ app.get('/api/invoices', (req, res) => {
 app.post('/api/invoices', (req, res) => {
   const newInvoiceData = req.body;
   const userId = newInvoiceData.userId || getReqUserId(req) || 'usr-1';
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  if (!isDemo && isDemoSeedEntity(newInvoiceData)) {
+    return res.status(200).json({ ...newInvoiceData, ignored: true });
+  }
   const invoices = getCollection('invoices');
   const newInvoice = {
     ...newInvoiceData,

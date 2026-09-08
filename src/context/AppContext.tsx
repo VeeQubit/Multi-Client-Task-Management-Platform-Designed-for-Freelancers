@@ -234,36 +234,109 @@ const DEMO_CLIENT_NAMES = new Set([
   'eduverse learning',
   'apex robotics & iot',
   'biohealth solutions',
+  'nova studio',
+  'fintech pulse',
 ]);
 
-const DEMO_TASK_TITLES = new Set([
-  'implement websocket reconnect logic & heartbeat',
-  'refactor checkout cart component & promo codes',
-  'design responsive mobile navigation drawer',
-  'design token dictionary & color palette',
-  'implement button, input & badge components in react',
-  'responsive landing page hero section & testimonials',
-  'real-time chart widget with websocket feeds',
-  'csv export & monthly statements builder',
-  'interactive quiz engine ui & score calculation',
-  'finalize dark theme contrast & color tokens',
-  'build interactive checkout form & validation',
+const DEMO_CLIENT_EMAILS = new Set([
+  'sarah.j@novastudio.design',
+  'sarah.j@gmail.com',
+  'mvance@fintechpulse.io',
+  'mvance@gmail.com',
+  'elena@eduverse.org',
+  'elena@gmail.com',
+  'david.kim@apexrobotics.io',
+  'clara.o@biohealth.co',
+]);
+
+const DEMO_INVOICE_NUMBERS = new Set([
+  'inv-2026-001',
+  'inv-2026-002',
+  'inv-2026-003',
+  'inv-2026-004',
+  'inv-2026-005',
+  'inv-2026-006',
+]);
+
+const DEMO_IDS = new Set([
+  'cli-1', 'cli-2', 'cli-3', 'cli-4', 'cli-5',
+  'prj-1', 'prj-2', 'prj-3', 'prj-4', 'prj-5',
+  'tsk-1', 'tsk-2', 'tsk-3', 'tsk-4', 'tsk-5', 'tsk-6', 'tsk-7', 'tsk-8',
+  'inv-101', 'inv-102', 'inv-103', 'inv-1', 'inv-2', 'inv-3',
+  'time-1', 'time-2', 'time-3', 'time-4',
+  'notif-1', 'notif-2', 'notif-3', 'notif-4',
 ]);
 
 export function isDemoSeedEntity(item: any): boolean {
   if (!item) return false;
   if (item.userId === 'usr-1' || item.userId === 'usr-demo') return true;
+
   if (typeof item.id === 'string') {
-    if (item.id === 'cli-1' || item.id === 'cli-2' || item.id === 'cli-3' || item.id === 'cli-4' || item.id === 'cli-5') return true;
-    if (item.id === 'prj-1' || item.id === 'prj-2' || item.id === 'prj-3' || item.id === 'prj-4' || item.id === 'prj-5') return true;
-    if (item.id.startsWith('tsk-') && (item.id.length <= 6 || item.id.includes('tsk-1') || item.id.includes('tsk-2') || item.id.includes('tsk-3'))) return true;
-    if (item.id.startsWith('inv-') && item.id.length <= 6) return true;
-    if (item.id.startsWith('time-') && item.id.length <= 7) return true;
+    const idLower = item.id.toLowerCase();
+    if (DEMO_IDS.has(idLower)) return true;
+    if (idLower.startsWith('cli-') && idLower.length <= 6) return true;
+    if (idLower.startsWith('prj-') && idLower.length <= 6) return true;
+    if (idLower.startsWith('tsk-') && !idLower.includes('tsk-1788') && idLower.length <= 8) return true;
+    if (idLower.startsWith('inv-') && (idLower.length <= 8 || idLower.startsWith('inv-10'))) return true;
+    if (idLower.startsWith('time-') && (idLower.length <= 8 || idLower.startsWith('time-10'))) return true;
+    if (idLower.startsWith('notif-') && idLower.length <= 8) return true;
   }
-  if (item.title && DEMO_PROJECT_TITLES.has(item.title.trim().toLowerCase())) return true;
-  if (item.title && DEMO_TASK_TITLES.has(item.title.trim().toLowerCase())) return true;
+
+  if (item.invoiceNumber && DEMO_INVOICE_NUMBERS.has(item.invoiceNumber.trim().toLowerCase())) return true;
+
+  if (item.clientName && DEMO_CLIENT_NAMES.has(item.clientName.trim().toLowerCase())) return true;
+  if (item.clientCompany && DEMO_CLIENT_NAMES.has(item.clientCompany.trim().toLowerCase())) return true;
+  if (item.clientEmail && DEMO_CLIENT_EMAILS.has(item.clientEmail.trim().toLowerCase())) return true;
+
   if (item.name && DEMO_CLIENT_NAMES.has(item.name.trim().toLowerCase())) return true;
   if (item.company && DEMO_CLIENT_NAMES.has(item.company.trim().toLowerCase())) return true;
+  if (item.email && DEMO_CLIENT_EMAILS.has(item.email.trim().toLowerCase())) return true;
+
+  if (item.clientId && ['cli-1', 'cli-2', 'cli-3', 'cli-4', 'cli-5'].includes(item.clientId)) return true;
+  if (item.projectId && ['prj-1', 'prj-2', 'prj-3', 'prj-4', 'prj-5'].includes(item.projectId)) return true;
+
+  if (item.title) {
+    const t = item.title.trim().toLowerCase();
+    if (DEMO_PROJECT_TITLES.has(t)) return true;
+    if (
+      t.includes('nova design system') ||
+      t.includes('pulse financial') ||
+      t.includes('fintech pulse') ||
+      t.includes('eduverse interactive') ||
+      t.includes('apex iot telemetry') ||
+      t.includes('nova studio brand') ||
+      t.includes('websocket reconnect') ||
+      t.includes('refactor checkout cart') ||
+      t.includes('mobile navigation drawer') ||
+      t.includes('audit high-contrast theme') ||
+      t.includes('quiz component') ||
+      t.includes('interactive quiz') ||
+      t.includes('iot telemetry dashboard') ||
+      t.includes('svg icon sprite') ||
+      t.includes('two-factor auth') ||
+      t.includes('dark theme contrast') ||
+      t.includes('interactive checkout form') ||
+      t.includes('hero illustration')
+    ) {
+      return true;
+    }
+  }
+
+  if (item.description) {
+    const d = item.description.trim().toLowerCase();
+    if (
+      d.includes('websocket reconnect') ||
+      d.includes('promo code dynamic discount') ||
+      d.includes('mobile gesture swipe drawer') ||
+      d.includes('gamified student badge') ||
+      d.includes('dark mode contrast on financial') ||
+      d.includes('interactive checkout validation') ||
+      d.includes('sprint planning and milestone alignment')
+    ) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -608,10 +681,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  // When user changes, load their isolated data
+  // When user changes, load their isolated data and sanitize storage
   useEffect(() => {
     if (user) {
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      const isDemo = isDemoAccount(user);
+      if (!isDemo) {
+        // Sanitize all local storage keys for this user to purge old cached demo data
+        const sanitizeKey = (key: string) => {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                const cleaned = parsed.filter(item => !isDemoSeedEntity(item));
+                localStorage.setItem(key, JSON.stringify(cleaned));
+              }
+            }
+          } catch {}
+        };
+        sanitizeKey(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`);
+        sanitizeKey(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`);
+        sanitizeKey(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`);
+        sanitizeKey(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`);
+        sanitizeKey(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`);
+      }
       loadUserData(user);
     } else {
       localStorage.removeItem(STORAGE_KEYS.USER);
@@ -626,31 +720,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(clients));
+      const isDemo = isDemoAccount(user);
+      const dataToSave = isDemo ? clients : clients.filter(c => !isDemoSeedEntity(c));
+      localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(dataToSave));
     }
   }, [clients, user?.id]);
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`, JSON.stringify(projects));
+      const isDemo = isDemoAccount(user);
+      const dataToSave = isDemo ? projects : projects.filter(p => !isDemoSeedEntity(p));
+      localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`, JSON.stringify(dataToSave));
     }
   }, [projects, user?.id]);
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(tasks));
+      const isDemo = isDemoAccount(user);
+      const dataToSave = isDemo ? tasks : tasks.filter(t => !isDemoSeedEntity(t));
+      localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(dataToSave));
     }
   }, [tasks, user?.id]);
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`, JSON.stringify(timeEntries));
+      const isDemo = isDemoAccount(user);
+      const dataToSave = isDemo ? timeEntries : timeEntries.filter(t => !isDemoSeedEntity(t));
+      localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`, JSON.stringify(dataToSave));
     }
   }, [timeEntries, user?.id]);
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`, JSON.stringify(invoices));
+      const isDemo = isDemoAccount(user);
+      const dataToSave = isDemo ? invoices : invoices.filter(i => !isDemoSeedEntity(i));
+      localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`, JSON.stringify(dataToSave));
     }
   }, [invoices, user?.id]);
 

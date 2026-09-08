@@ -349,6 +349,134 @@ export const initialSeed = {
   ],
 };
 
+// Demo Identification Sets
+const DEMO_PROJECT_TITLES = new Set([
+  'nova design system & e-commerce landing',
+  'fintech pulse analytics & crypto dashboard',
+  'pulse financial analytics dashboard',
+  'eduverse interactive lms gamification',
+  'eduverse interactive student portal',
+  'apex iot telemetry real-time portal',
+  'nova studio brand identity guidelines pdf',
+]);
+
+const DEMO_CLIENT_NAMES = new Set([
+  'sarah jenkins',
+  'marcus vance',
+  'elena rostova',
+  'david kim',
+  'clara oswald',
+  'nova brand studio',
+  'fintech pulse corp',
+  'eduverse learning',
+  'apex robotics & iot',
+  'biohealth solutions',
+  'nova studio',
+  'fintech pulse',
+]);
+
+const DEMO_CLIENT_EMAILS = new Set([
+  'sarah.j@novastudio.design',
+  'sarah.j@gmail.com',
+  'mvance@fintechpulse.io',
+  'mvance@gmail.com',
+  'elena@eduverse.org',
+  'elena@gmail.com',
+  'david.kim@apexrobotics.io',
+  'clara.o@biohealth.co',
+]);
+
+const DEMO_INVOICE_NUMBERS = new Set([
+  'inv-2026-001',
+  'inv-2026-002',
+  'inv-2026-003',
+  'inv-2026-004',
+  'inv-2026-005',
+  'inv-2026-006',
+]);
+
+const DEMO_IDS = new Set([
+  'cli-1', 'cli-2', 'cli-3', 'cli-4', 'cli-5',
+  'prj-1', 'prj-2', 'prj-3', 'prj-4', 'prj-5',
+  'tsk-1', 'tsk-2', 'tsk-3', 'tsk-4', 'tsk-5', 'tsk-6', 'tsk-7', 'tsk-8',
+  'inv-101', 'inv-102', 'inv-103', 'inv-1', 'inv-2', 'inv-3',
+  'time-1', 'time-2', 'time-3', 'time-4',
+  'notif-1', 'notif-2', 'notif-3', 'notif-4',
+]);
+
+export function isDemoSeedEntity(item) {
+  if (!item) return false;
+  if (item.userId === 'usr-1' || item.userId === 'usr-demo') return true;
+
+  if (typeof item.id === 'string') {
+    const idLower = item.id.toLowerCase();
+    if (DEMO_IDS.has(idLower)) return true;
+    if (idLower.startsWith('cli-') && idLower.length <= 6) return true;
+    if (idLower.startsWith('prj-') && idLower.length <= 6) return true;
+    if (idLower.startsWith('tsk-') && !idLower.includes('tsk-1788') && idLower.length <= 8) return true;
+    if (idLower.startsWith('inv-') && (idLower.length <= 8 || idLower.startsWith('inv-10'))) return true;
+    if (idLower.startsWith('time-') && (idLower.length <= 8 || idLower.startsWith('time-10'))) return true;
+    if (idLower.startsWith('notif-') && idLower.length <= 8) return true;
+  }
+
+  if (item.invoiceNumber && DEMO_INVOICE_NUMBERS.has(item.invoiceNumber.trim().toLowerCase())) return true;
+
+  if (item.clientName && DEMO_CLIENT_NAMES.has(item.clientName.trim().toLowerCase())) return true;
+  if (item.clientCompany && DEMO_CLIENT_NAMES.has(item.clientCompany.trim().toLowerCase())) return true;
+  if (item.clientEmail && DEMO_CLIENT_EMAILS.has(item.clientEmail.trim().toLowerCase())) return true;
+
+  if (item.name && DEMO_CLIENT_NAMES.has(item.name.trim().toLowerCase())) return true;
+  if (item.company && DEMO_CLIENT_NAMES.has(item.company.trim().toLowerCase())) return true;
+  if (item.email && DEMO_CLIENT_EMAILS.has(item.email.trim().toLowerCase())) return true;
+
+  if (item.clientId && ['cli-1', 'cli-2', 'cli-3', 'cli-4', 'cli-5'].includes(item.clientId)) return true;
+  if (item.projectId && ['prj-1', 'prj-2', 'prj-3', 'prj-4', 'prj-5'].includes(item.projectId)) return true;
+
+  if (item.title) {
+    const t = item.title.trim().toLowerCase();
+    if (DEMO_PROJECT_TITLES.has(t)) return true;
+    if (
+      t.includes('nova design system') ||
+      t.includes('pulse financial') ||
+      t.includes('fintech pulse') ||
+      t.includes('eduverse interactive') ||
+      t.includes('apex iot telemetry') ||
+      t.includes('nova studio brand') ||
+      t.includes('websocket reconnect') ||
+      t.includes('refactor checkout cart') ||
+      t.includes('mobile navigation drawer') ||
+      t.includes('audit high-contrast theme') ||
+      t.includes('quiz component') ||
+      t.includes('interactive quiz') ||
+      t.includes('iot telemetry dashboard') ||
+      t.includes('svg icon sprite') ||
+      t.includes('two-factor auth') ||
+      t.includes('dark theme contrast') ||
+      t.includes('interactive checkout form') ||
+      t.includes('hero illustration')
+    ) {
+      return true;
+    }
+  }
+
+  if (item.description) {
+    const d = item.description.trim().toLowerCase();
+    if (
+      d.includes('websocket reconnect') ||
+      d.includes('promo code dynamic discount') ||
+      d.includes('mobile gesture swipe drawer') ||
+      d.includes('gamified student badge') ||
+      d.includes('dark mode contrast on financial') ||
+      d.includes('interactive checkout validation') ||
+      d.includes('sprint planning and milestone alignment')
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Deterministic user ID generator based on email
 export const getDeterministicUserId = (email) => {
   const norm = (email || '').trim().toLowerCase();
@@ -395,12 +523,13 @@ export const getCollection = (collectionName, userId) => {
   const db = readDb();
   const items = db[collectionName] || [];
   if (!userId) return items;
-  // If demo account (usr-1 or usr-demo), allow access to demo seed items as well
+  // If demo account (usr-1 or usr-demo), allow access to demo seed items
   const isDemo = userId === 'usr-1' || userId === 'usr-demo';
-  return items.filter(item => {
-    if (isDemo) return item.userId === 'usr-1' || item.userId === 'usr-demo' || !item.userId;
-    return item.userId === userId;
-  });
+  if (isDemo) {
+    return items.filter(item => item.userId === 'usr-1' || item.userId === 'usr-demo' || !item.userId);
+  }
+  // Real registered users strictly receive only their own non-demo items
+  return items.filter(item => item.userId === userId && !isDemoSeedEntity(item));
 };
 
 export const saveCollection = (collectionName, items) => {
