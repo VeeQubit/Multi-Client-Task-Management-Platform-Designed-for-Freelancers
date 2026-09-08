@@ -213,23 +213,77 @@ function safeGetStorage<T>(key: string, fallback: T): T {
   }
 }
 
+const DEMO_PROJECT_TITLES = new Set([
+  'nova design system & e-commerce landing',
+  'fintech pulse analytics & crypto dashboard',
+  'pulse financial analytics dashboard',
+  'eduverse interactive lms gamification',
+  'eduverse interactive student portal',
+  'apex iot telemetry real-time portal',
+  'nova studio brand identity guidelines pdf',
+]);
+
+const DEMO_CLIENT_NAMES = new Set([
+  'sarah jenkins',
+  'marcus vance',
+  'elena rostova',
+  'david kim',
+  'clara oswald',
+  'nova brand studio',
+  'fintech pulse corp',
+  'eduverse learning',
+  'apex robotics & iot',
+  'biohealth solutions',
+]);
+
+const DEMO_TASK_TITLES = new Set([
+  'implement websocket reconnect logic & heartbeat',
+  'refactor checkout cart component & promo codes',
+  'design responsive mobile navigation drawer',
+  'design token dictionary & color palette',
+  'implement button, input & badge components in react',
+  'responsive landing page hero section & testimonials',
+  'real-time chart widget with websocket feeds',
+  'csv export & monthly statements builder',
+  'interactive quiz engine ui & score calculation',
+  'finalize dark theme contrast & color tokens',
+  'build interactive checkout form & validation',
+]);
+
+export function isDemoSeedEntity(item: any): boolean {
+  if (!item) return false;
+  if (item.userId === 'usr-1' || item.userId === 'usr-demo') return true;
+  if (typeof item.id === 'string') {
+    if (item.id === 'cli-1' || item.id === 'cli-2' || item.id === 'cli-3' || item.id === 'cli-4' || item.id === 'cli-5') return true;
+    if (item.id === 'prj-1' || item.id === 'prj-2' || item.id === 'prj-3' || item.id === 'prj-4' || item.id === 'prj-5') return true;
+    if (item.id.startsWith('tsk-') && (item.id.length <= 6 || item.id.includes('tsk-1') || item.id.includes('tsk-2') || item.id.includes('tsk-3'))) return true;
+    if (item.id.startsWith('inv-') && item.id.length <= 6) return true;
+    if (item.id.startsWith('time-') && item.id.length <= 7) return true;
+  }
+  if (item.title && DEMO_PROJECT_TITLES.has(item.title.trim().toLowerCase())) return true;
+  if (item.title && DEMO_TASK_TITLES.has(item.title.trim().toLowerCase())) return true;
+  if (item.name && DEMO_CLIENT_NAMES.has(item.name.trim().toLowerCase())) return true;
+  if (item.company && DEMO_CLIENT_NAMES.has(item.company.trim().toLowerCase())) return true;
+  return false;
+}
+
 function getSavedUserDataWithMigration<T>(prefix: string, currentUser: UserProfile | null, fallback: T): T {
   if (!currentUser) return fallback;
+  const isDemo = isDemoAccount(currentUser);
   const directKey = `${prefix}${currentUser.id}`;
   const directSaved = localStorage.getItem(directKey);
+
   if (directSaved) {
     try {
       const parsed = JSON.parse(directSaved);
       if (Array.isArray(parsed)) {
-        // If non-demo user, ensure demo items aren't returned
-        if (!isDemoAccount(currentUser)) {
-          const nonDemoItems = parsed.filter((item: any) => {
-            if (!item) return false;
-            if (item.userId === 'usr-1' || item.userId === 'usr-demo') return false;
-            if (typeof item.id === 'string' && (item.id.startsWith('cli-1') || item.id === 'cli-2' || item.id === 'cli-3' || item.id.startsWith('prj-') && item.id.length <= 6 || item.id.startsWith('tsk-') && item.id.length <= 6)) return false;
-            return true;
-          });
-          return nonDemoItems as T;
+        if (!isDemo) {
+          // Strictly remove any demo items
+          const cleaned = parsed.filter(item => !isDemoSeedEntity(item));
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem(directKey, JSON.stringify(cleaned));
+          }
+          return cleaned as T;
         }
         return parsed as T;
       }
@@ -240,7 +294,6 @@ function getSavedUserDataWithMigration<T>(prefix: string, currentUser: UserProfi
   }
 
   // Scan localStorage for any legacy key belonging to this NON-DEMO user
-  const isDemo = isDemoAccount(currentUser);
   if (!isDemo) {
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -256,10 +309,10 @@ function getSavedUserDataWithMigration<T>(prefix: string, currentUser: UserProfi
           if (val) {
             const parsed = JSON.parse(val);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              const nonDemo = parsed.filter((item: any) => item && item.userId !== 'usr-1' && item.userId !== 'usr-demo');
-              if (nonDemo.length > 0) {
-                localStorage.setItem(directKey, JSON.stringify(nonDemo));
-                return nonDemo as T;
+              const cleaned = parsed.filter(item => !isDemoSeedEntity(item));
+              if (cleaned.length > 0) {
+                localStorage.setItem(directKey, JSON.stringify(cleaned));
+                return cleaned as T;
               }
             }
           }
@@ -462,17 +515,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.getInvoices(currentUser.id).catch(() => null),
       api.getNotifications(currentUser.id).catch(() => null),
     ]).then(([apiClients, apiProjects, apiTasks, apiTime, apiInvoices, apiNotifs]) => {
-      const isDemoItem = (id?: string) => !isDemo && typeof id === 'string' && (id === 'cli-1' || id === 'cli-2' || id === 'cli-3' || id === 'prj-1' || id === 'prj-2' || id === 'prj-3' || id.startsWith('tsk-') && id.length <= 6 || id.startsWith('inv-') && id.length <= 6);
-
       if (apiClients !== null) {
         setClients(prev => {
           const map = new Map<string, Client>();
-          prev.filter(c => !isDemoItem(c.id)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
-          apiClients.filter(c => !isDemoItem(c.id)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          prev.filter(c => isDemo || !isDemoSeedEntity(c)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          apiClients.filter(c => isDemo || !isDemoSeedEntity(c)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
           const merged = Array.from(map.values());
+          if (!isDemo) {
+            localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${currentUser.id}`, JSON.stringify(merged));
+          }
           // Sync local-only items to backend
           prev.forEach(item => {
-            if (!isDemoItem(item.id) && !apiClients.some(ac => ac.id === item.id)) {
+            if ((isDemo || !isDemoSeedEntity(item)) && !apiClients.some(ac => ac.id === item.id)) {
               api.createClient({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -482,11 +536,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiProjects !== null) {
         setProjects(prev => {
           const map = new Map<string, Project>();
-          prev.filter(p => !isDemoItem(p.id)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
-          apiProjects.filter(p => !isDemoItem(p.id)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          prev.filter(p => isDemo || !isDemoSeedEntity(p)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          apiProjects.filter(p => isDemo || !isDemoSeedEntity(p)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
           const merged = Array.from(map.values());
+          if (!isDemo) {
+            localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${currentUser.id}`, JSON.stringify(merged));
+          }
           prev.forEach(item => {
-            if (!isDemoItem(item.id) && !apiProjects.some(ap => ap.id === item.id)) {
+            if ((isDemo || !isDemoSeedEntity(item)) && !apiProjects.some(ap => ap.id === item.id)) {
               api.createProject({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -496,11 +553,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiTasks !== null) {
         setTasks(prev => {
           const map = new Map<string, Task>();
-          prev.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
-          apiTasks.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          prev.filter(t => isDemo || !isDemoSeedEntity(t)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTasks.filter(t => isDemo || !isDemoSeedEntity(t)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
           const merged = Array.from(map.values());
+          if (!isDemo) {
+            localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${currentUser.id}`, JSON.stringify(merged));
+          }
           prev.forEach(item => {
-            if (!isDemoItem(item.id) && !apiTasks.some(at => at.id === item.id)) {
+            if ((isDemo || !isDemoSeedEntity(item)) && !apiTasks.some(at => at.id === item.id)) {
               api.createTask({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -510,11 +570,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiTime !== null) {
         setTimeEntries(prev => {
           const map = new Map<string, TimeEntry>();
-          prev.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
-          apiTime.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          prev.filter(t => isDemo || !isDemoSeedEntity(t)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTime.filter(t => isDemo || !isDemoSeedEntity(t)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
           const merged = Array.from(map.values());
+          if (!isDemo) {
+            localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${currentUser.id}`, JSON.stringify(merged));
+          }
           prev.forEach(item => {
-            if (!isDemoItem(item.id) && !apiTime.some(at => at.id === item.id)) {
+            if ((isDemo || !isDemoSeedEntity(item)) && !apiTime.some(at => at.id === item.id)) {
               api.createTimeEntry({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -524,11 +587,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiInvoices !== null) {
         setInvoices(prev => {
           const map = new Map<string, Invoice>();
-          prev.filter(i => !isDemoItem(i.id)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
-          apiInvoices.filter(i => !isDemoItem(i.id)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          prev.filter(i => isDemo || !isDemoSeedEntity(i)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          apiInvoices.filter(i => isDemo || !isDemoSeedEntity(i)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
           const merged = Array.from(map.values());
+          if (!isDemo) {
+            localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${currentUser.id}`, JSON.stringify(merged));
+          }
           prev.forEach(item => {
-            if (!isDemoItem(item.id) && !apiInvoices.some(ai => ai.id === item.id)) {
+            if ((isDemo || !isDemoSeedEntity(item)) && !apiInvoices.some(ai => ai.id === item.id)) {
               api.createInvoice({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
