@@ -30,49 +30,69 @@ app.get('/api/health', (req, res) => {
 
 // --- Auth Endpoints ---
 app.post('/api/auth/login', (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email address is required' });
   }
 
   const db = readDb();
-  let user = db.user;
-  if (!user || user.email !== email) {
-    user = {
-      id: `usr-${Date.now()}`,
-      name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      email,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
-      title: 'Freelance Professional',
-      hourlyRate: 65,
-      currency: '$',
-      bio: 'Independent freelancer managing multiple client projects.',
-      notificationSettings: {
-        email: true,
-        sms: true,
-        browser: true,
-        sound: true,
-        deadlineReminderHours: 24,
-      },
-    };
-    db.user = user;
-    writeDb(db);
+  const users = db.users || [];
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Find user by email
+  const existingUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+  if (!existingUser) {
+    return res.status(401).json({
+      error: 'Invalid credentials: No account is registered with this email. Please create an account first.',
+    });
   }
 
-  res.json({ success: true, user });
+  // If password provided, verify password
+  if (password && existingUser.password && existingUser.password !== password) {
+    return res.status(401).json({
+      error: 'Invalid credentials: The password you entered is incorrect. Please check and try again.',
+    });
+  }
+
+  // Remove password before sending to client
+  const { password: _, ...safeUser } = existingUser;
+  db.user = safeUser;
+  writeDb(db);
+
+  res.json({ success: true, user: safeUser });
 });
 
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, profession } = req.body;
-  if (!name || !email) {
-    return res.status(400).json({ error: 'Name and email are required' });
+  const { name, email, password, profession } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Full name is required' });
+  }
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'A valid email address is required' });
+  }
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
   }
 
   const db = readDb();
+  const users = db.users || [];
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Check duplicate email
+  const alreadyExists = users.some(u => u.email.toLowerCase() === normalizedEmail);
+  if (alreadyExists) {
+    return res.status(409).json({
+      error: 'An account with this email address already exists. Please sign in instead.',
+    });
+  }
+
   const newUser = {
     id: `usr-${Date.now()}`,
-    name,
-    email,
+    name: name.trim(),
+    email: normalizedEmail,
+    password,
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
     title: profession || 'Independent Freelancer',
     hourlyRate: 65,
@@ -87,9 +107,65 @@ app.post('/api/auth/register', (req, res) => {
     },
   };
 
-  db.user = newUser;
+  users.push(newUser);
+  db.users = users;
+  const { password: _, ...safeUser } = newUser;
+  db.user = safeUser;
   writeDb(db);
-  res.status(201).json({ success: true, user: newUser });
+
+  res.status(201).json({ success: true, user: safeUser });
+});
+
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email address is required' });
+  }
+
+  const db = readDb();
+  const users = db.users || [];
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+  if (!user) {
+    return res.status(404).json({
+      error: 'No registered account found with this email address. Please verify your email.',
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Account verified! You may now set your new password.',
+    email: normalizedEmail,
+  });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) {
+    return res.status(400).json({ error: 'Email and new password are required' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+  }
+
+  const db = readDb();
+  const users = db.users || [];
+  const normalizedEmail = email.trim().toLowerCase();
+  const index = users.findIndex(u => u.email.toLowerCase() === normalizedEmail);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'User account not found.' });
+  }
+
+  users[index].password = newPassword;
+  db.users = users;
+  writeDb(db);
+
+  res.json({
+    success: true,
+    message: 'Your password has been successfully updated! You can now sign in.',
+  });
 });
 
 app.get('/api/auth/me', (req, res) => {
@@ -101,6 +177,13 @@ app.put('/api/auth/profile', (req, res) => {
   const updates = req.body;
   const db = readDb();
   db.user = { ...(db.user || {}), ...updates };
+  // Update in users array as well
+  if (db.users && db.user) {
+    const idx = db.users.findIndex(u => u.id === db.user.id);
+    if (idx !== -1) {
+      db.users[idx] = { ...db.users[idx], ...updates };
+    }
+  }
   writeDb(db);
   res.json({ success: true, user: db.user });
 });

@@ -32,16 +32,28 @@ export const api = {
   checkHealth: () => fetchJson<{ status: string }>('/health'),
 
   // Auth
-  login: (email: string) =>
+  login: (email: string, password?: string) =>
     fetchJson<{ success: boolean; user: UserProfile }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  register: (name: string, email: string, password?: string, profession?: string) =>
+    fetchJson<{ success: boolean; user: UserProfile }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, profession }),
+    }),
+
+  forgotPassword: (email: string) =>
+    fetchJson<{ success: boolean; message: string; email: string }>('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
     }),
 
-  register: (name: string, email: string, profession?: string) =>
-    fetchJson<{ success: boolean; user: UserProfile }>('/auth/register', {
+  resetPassword: (email: string, newPassword: string) =>
+    fetchJson<{ success: boolean; message: string }>('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ name, email, profession }),
+      body: JSON.stringify({ email, newPassword }),
     }),
 
   getCurrentUser: () => fetchJson<{ user: UserProfile | null }>('/auth/me'),

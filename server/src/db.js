@@ -8,7 +8,45 @@ const DATA_DIR = path.join(__dirname, '../data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 // Initial seed data
-const initialSeed = {
+export const initialSeed = {
+  users: [
+    {
+      id: 'usr-1',
+      name: 'Alex Rivera',
+      email: 'alex.rivera@gmail.com',
+      password: 'password123',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+      title: 'Senior Graphic & UI Designer',
+      hourlyRate: 65,
+      currency: '$',
+      bio: 'Specialized in building modern web interfaces, digital branding, and UI systems.',
+      notificationSettings: {
+        email: true,
+        sms: true,
+        browser: true,
+        sound: true,
+        deadlineReminderHours: 24,
+      },
+    },
+    {
+      id: 'usr-demo',
+      name: 'Demo Freelancer',
+      email: 'demo@meplus.io',
+      password: 'demouser123',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
+      title: 'Full-Stack Developer',
+      hourlyRate: 75,
+      currency: '$',
+      bio: 'Freelancer demo workspace account.',
+      notificationSettings: {
+        email: true,
+        sms: true,
+        browser: true,
+        sound: true,
+        deadlineReminderHours: 24,
+      },
+    },
+  ],
   user: {
     id: 'usr-1',
     name: 'Alex Rivera',
@@ -325,7 +363,11 @@ export const readDb = () => {
   initDb();
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.users) {
+      parsed.users = initialSeed.users;
+    }
+    return parsed;
   } catch (error) {
     console.error('Error reading db.json, returning seed:', error);
     return initialSeed;

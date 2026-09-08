@@ -44,8 +44,10 @@ interface AppContextType {
   // Auth & User
   user: UserProfile | null;
   isAuthenticated: boolean;
-  login: (email: string) => boolean;
-  register: (name: string, email: string, title?: string) => boolean;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, password: string, profession?: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  resetPassword: (email: string, newPassword: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   loginDemoUser: () => void;
   logout: () => void;
   updateUserProfile: (profile: Partial<UserProfile>) => void;
@@ -141,6 +143,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   USER: 'meplus_user_v1',
+  USERS: 'meplus_registered_users_v1',
   CLIENTS: 'meplus_clients_v1',
   PROJECTS: 'meplus_projects_v1',
   TASKS: 'meplus_tasks_v1',
@@ -149,6 +152,43 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'meplus_notifications_v1',
   ACTIVE_TIMER: 'meplus_active_timer_v1',
 };
+
+interface RegisteredAccount {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  title?: string;
+  avatar?: string;
+  hourlyRate?: number;
+  currency?: string;
+  bio?: string;
+}
+
+const defaultRegisteredUsers: RegisteredAccount[] = [
+  {
+    id: 'usr-1',
+    name: 'Alex Rivera',
+    email: 'alex.rivera@gmail.com',
+    password: 'password123',
+    title: 'Senior Graphic & UI Designer',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+    hourlyRate: 65,
+    currency: '$',
+    bio: 'Specialized in building modern web interfaces, digital branding, and UI systems.',
+  },
+  {
+    id: 'usr-demo',
+    name: 'Alex Rivera',
+    email: 'demo@meplus.io',
+    password: 'password123',
+    title: 'Senior Graphic & UI Designer',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+    hourlyRate: 65,
+    currency: '$',
+    bio: 'Specialized in building modern web interfaces, digital branding, and UI systems.',
+  },
+];
 
 function safeGetStorage<T>(key: string, fallback: T): T {
   try {
@@ -165,6 +205,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Registered Users Directory (for client-side auth verification)
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredAccount[]>(() => {
+    return safeGetStorage<RegisteredAccount[]>(STORAGE_KEYS.USERS, defaultRegisteredUsers);
+  });
 
   // User & Auth State
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -348,43 +393,206 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
+  // Sync registered users to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(registeredUsers));
+  }, [registeredUsers]);
+
   // User Actions
-  const login = (email: string) => {
-    const loggedUser = {
-      ...initialUser,
-      email,
-      name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+  const login = async (email: string, password?: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      const res = await api.login(normalizedEmail, password);
+      if (res && res.user) {
+        setUser(res.user);
+        showToast({
+          title: 'Welcome back!',
+          message: `Signed in as ${res.user.name || res.user.email}`,
+          type: 'success',
+        });
+        return { success: true };
+      }
+    } catch (err: any) {
+      // If backend explicitly rejected invalid user or wrong password, return error directly!
+      const errorMsg = err?.message || 'Invalid email or password.';
+      return { success: false, error: errorMsg };
+    }
+
+    // Client-side fallback directory check
+    const matched = registeredUsers.find(u => u.email.toLowerCase() === normalizedEmail);
+    if (!matched) {
+      return {
+        success: false,
+        error: 'Invalid credentials: No account is registered with this email. Please create an account first.',
+      };
+    }
+
+    if (password && matched.password && matched.password !== password) {
+      return {
+        success: false,
+        error: 'Invalid credentials: The password you entered is incorrect. Please check and try again.',
+      };
+    }
+
+    const authenticatedUser: UserProfile = {
+      id: matched.id,
+      name: matched.name,
+      email: matched.email,
+      avatar: matched.avatar || initialUser.avatar,
+      title: matched.title || initialUser.title,
+      hourlyRate: matched.hourlyRate || 65,
+      currency: matched.currency || '$',
+      bio: matched.bio || initialUser.bio,
+      skills: initialUser.skills,
+      notificationSettings: initialUser.notificationSettings,
+      theme: 'light',
     };
-    setUser(loggedUser);
-    api.login(email).catch(() => {});
+
+    setUser(authenticatedUser);
     showToast({
       title: 'Welcome back!',
-      message: `Signed in as ${email}`,
+      message: `Signed in as ${authenticatedUser.name}`,
       type: 'success',
     });
-    return true;
+    return { success: true };
   };
 
-  const register = (name: string, email: string, title?: string) => {
-    const newUserObj = {
-      ...initialUser,
-      name,
-      email,
-      title: title || 'Independent Professional & Freelancer',
+  const register = async (name: string, email: string, password: string, profession?: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check duplicate
+    const exists = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
+    if (exists) {
+      return {
+        success: false,
+        error: 'An account with this email address already exists. Please sign in instead.',
+      };
+    }
+
+    try {
+      const res = await api.register(name, normalizedEmail, password, profession);
+      if (res && res.user) {
+        setUser(res.user);
+        setRegisteredUsers(prev => [
+          ...prev.filter(u => u.email.toLowerCase() !== normalizedEmail),
+          {
+            id: res.user.id,
+            name: res.user.name,
+            email: normalizedEmail,
+            password,
+            title: res.user.title,
+          },
+        ]);
+        showToast({
+          title: 'Account Created!',
+          message: `Welcome to Me Plus, ${name}!`,
+          type: 'success',
+        });
+        return { success: true };
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('already exists')) {
+        return { success: false, error: err.message };
+      }
+    }
+
+    // Local client registration
+    const newUserAccount: RegisteredAccount = {
+      id: `usr-${Date.now()}`,
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+      title: profession || 'Independent Freelancer',
+      avatar: initialUser.avatar,
     };
-    setUser(newUserObj);
-    api.register(name, email, title).catch(() => {});
+
+    setRegisteredUsers(prev => [...prev, newUserAccount]);
+
+    const newUserProfile: UserProfile = {
+      id: newUserAccount.id,
+      name: newUserAccount.name,
+      email: newUserAccount.email,
+      avatar: initialUser.avatar,
+      title: newUserAccount.title || 'Independent Freelancer',
+      hourlyRate: 65,
+      currency: '$',
+      bio: `Freelancer specializing in ${profession || 'creative and digital services'}.`,
+      skills: initialUser.skills,
+      notificationSettings: initialUser.notificationSettings,
+      theme: 'light',
+    };
+
+    setUser(newUserProfile);
     showToast({
       title: 'Account Created!',
       message: `Welcome to Me Plus, ${name}!`,
       type: 'success',
     });
-    return true;
+    return { success: true };
+  };
+
+  const forgotPassword = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      const res = await api.forgotPassword(normalizedEmail);
+      if (res && res.success) {
+        return { success: true, message: res.message };
+      }
+    } catch (err: any) {
+      // Backend reported user not found
+      return { success: false, error: err?.message || 'No account found with this email address.' };
+    }
+
+    // Check local directory
+    const found = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
+    if (!found) {
+      return {
+        success: false,
+        error: 'No registered account found with this email address. Please verify your email.',
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Account verified! You may now set your new password.',
+    };
+  };
+
+  const resetPassword = async (email: string, newPassword: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (newPassword.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long.' };
+    }
+
+    try {
+      await api.resetPassword(normalizedEmail, newPassword);
+    } catch {
+      // continue with local update
+    }
+
+    // Update local directory
+    setRegisteredUsers(prev =>
+      prev.map(u => (u.email.toLowerCase() === normalizedEmail ? { ...u, password: newPassword } : u))
+    );
+
+    showToast({
+      title: 'Password Updated',
+      message: 'Your password has been changed. You can now sign in with your new password.',
+      type: 'success',
+    });
+
+    return {
+      success: true,
+      message: 'Your password has been successfully updated! You can now sign in.',
+    };
   };
 
   const loginDemoUser = () => {
     setUser(initialUser);
-    api.login(initialUser.email).catch(() => {});
+    api.login(initialUser.email, 'password123').catch(() => {});
     showToast({
       title: 'Demo Mode Activated',
       message: 'Logged in as Alex Rivera with sample projects & clients.',
@@ -1014,6 +1222,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated: !!user,
         login,
         register,
+        forgotPassword,
+        resetPassword,
         loginDemoUser,
         logout,
         updateUserProfile,
