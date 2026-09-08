@@ -220,30 +220,54 @@ function getSavedUserDataWithMigration<T>(prefix: string, currentUser: UserProfi
   if (directSaved) {
     try {
       const parsed = JSON.parse(directSaved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as T;
-      if (!Array.isArray(parsed) && parsed) return parsed as T;
+      if (Array.isArray(parsed)) {
+        // If non-demo user, ensure demo items aren't returned
+        if (!isDemoAccount(currentUser)) {
+          const nonDemoItems = parsed.filter((item: any) => {
+            if (!item) return false;
+            if (item.userId === 'usr-1' || item.userId === 'usr-demo') return false;
+            if (typeof item.id === 'string' && (item.id.startsWith('cli-1') || item.id === 'cli-2' || item.id === 'cli-3' || item.id.startsWith('prj-') && item.id.length <= 6 || item.id.startsWith('tsk-') && item.id.length <= 6)) return false;
+            return true;
+          });
+          return nonDemoItems as T;
+        }
+        return parsed as T;
+      }
+      if (parsed) return parsed as T;
     } catch {
       // continue to legacy check
     }
   }
 
-  // Scan localStorage for any legacy key belonging to this user
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix) && key !== directKey) {
-        const val = localStorage.getItem(key);
-        if (val) {
-          const parsed = JSON.parse(val);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            localStorage.setItem(directKey, val);
-            return parsed as T;
+  // Scan localStorage for any legacy key belonging to this NON-DEMO user
+  const isDemo = isDemoAccount(currentUser);
+  if (!isDemo) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          key.startsWith(prefix) &&
+          key !== directKey &&
+          !key.endsWith('usr-1') &&
+          !key.endsWith('usr-demo')
+        ) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const nonDemo = parsed.filter((item: any) => item && item.userId !== 'usr-1' && item.userId !== 'usr-demo');
+              if (nonDemo.length > 0) {
+                localStorage.setItem(directKey, JSON.stringify(nonDemo));
+                return nonDemo as T;
+              }
+            }
           }
         }
       }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   return fallback;
@@ -438,15 +462,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.getInvoices(currentUser.id).catch(() => null),
       api.getNotifications(currentUser.id).catch(() => null),
     ]).then(([apiClients, apiProjects, apiTasks, apiTime, apiInvoices, apiNotifs]) => {
+      const isDemoItem = (id?: string) => !isDemo && typeof id === 'string' && (id === 'cli-1' || id === 'cli-2' || id === 'cli-3' || id === 'prj-1' || id === 'prj-2' || id === 'prj-3' || id.startsWith('tsk-') && id.length <= 6 || id.startsWith('inv-') && id.length <= 6);
+
       if (apiClients !== null) {
         setClients(prev => {
           const map = new Map<string, Client>();
-          prev.forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
-          apiClients.forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          prev.filter(c => !isDemoItem(c.id)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          apiClients.filter(c => !isDemoItem(c.id)).forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
           const merged = Array.from(map.values());
           // Sync local-only items to backend
           prev.forEach(item => {
-            if (!apiClients.some(ac => ac.id === item.id)) {
+            if (!isDemoItem(item.id) && !apiClients.some(ac => ac.id === item.id)) {
               api.createClient({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -456,11 +482,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiProjects !== null) {
         setProjects(prev => {
           const map = new Map<string, Project>();
-          prev.forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
-          apiProjects.forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          prev.filter(p => !isDemoItem(p.id)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          apiProjects.filter(p => !isDemoItem(p.id)).forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
           const merged = Array.from(map.values());
           prev.forEach(item => {
-            if (!apiProjects.some(ap => ap.id === item.id)) {
+            if (!isDemoItem(item.id) && !apiProjects.some(ap => ap.id === item.id)) {
               api.createProject({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -470,11 +496,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiTasks !== null) {
         setTasks(prev => {
           const map = new Map<string, Task>();
-          prev.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
-          apiTasks.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          prev.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTasks.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
           const merged = Array.from(map.values());
           prev.forEach(item => {
-            if (!apiTasks.some(at => at.id === item.id)) {
+            if (!isDemoItem(item.id) && !apiTasks.some(at => at.id === item.id)) {
               api.createTask({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -484,11 +510,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiTime !== null) {
         setTimeEntries(prev => {
           const map = new Map<string, TimeEntry>();
-          prev.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
-          apiTime.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          prev.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTime.filter(t => !isDemoItem(t.id)).forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
           const merged = Array.from(map.values());
           prev.forEach(item => {
-            if (!apiTime.some(at => at.id === item.id)) {
+            if (!isDemoItem(item.id) && !apiTime.some(at => at.id === item.id)) {
               api.createTimeEntry({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
@@ -498,11 +524,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (apiInvoices !== null) {
         setInvoices(prev => {
           const map = new Map<string, Invoice>();
-          prev.forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
-          apiInvoices.forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          prev.filter(i => !isDemoItem(i.id)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          apiInvoices.filter(i => !isDemoItem(i.id)).forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
           const merged = Array.from(map.values());
           prev.forEach(item => {
-            if (!apiInvoices.some(ai => ai.id === item.id)) {
+            if (!isDemoItem(item.id) && !apiInvoices.some(ai => ai.id === item.id)) {
               api.createInvoice({ ...item, userId: currentUser.id }).catch(() => {});
             }
           });
