@@ -25,7 +25,7 @@ import {
 
 export const AuthPage: React.FC = () => {
   const { login, register, loginDemoUser } = useApp();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, actualTheme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
 
   // Form fields
@@ -105,10 +105,10 @@ export const AuthPage: React.FC = () => {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors border border-slate-200/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-800/60 shadow-2xs"
-            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors border border-slate-200/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-800/60 shadow-2xs cursor-pointer"
+            title={`Switch to ${actualTheme === 'dark' ? 'Light' : 'Dark'} mode`}
           >
-            {theme === 'dark' ? (
+            {actualTheme === 'dark' ? (
               <>
                 <Sun className="w-4 h-4 text-amber-400" />
                 <span className="hidden sm:inline text-xs font-semibold">Light</span>

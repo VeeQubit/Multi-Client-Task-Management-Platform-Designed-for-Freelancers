@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setSelectedInvoiceForEdit,
   } = useApp();
 
-  const { theme, toggleTheme } = useTheme();
+  const { theme, actualTheme, toggleTheme } = useTheme();
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -288,10 +288,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
-          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+          title={`Switch to ${actualTheme === 'dark' ? 'Light' : 'Dark'} mode`}
           className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+          {actualTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
         </button>
 
         {/* Notification Bell with Badge */}

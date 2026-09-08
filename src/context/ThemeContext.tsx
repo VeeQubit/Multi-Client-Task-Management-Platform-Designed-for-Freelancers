@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   theme: Theme;
+  actualTheme: 'light' | 'dark';
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
 }
@@ -13,22 +14,66 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('meplus_theme') as Theme;
-    if (saved === 'dark') return 'dark';
-    return 'light'; // Default to Light theme
+    if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
+    // Auto-detect PC/OS preference if not set
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
   });
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+  const [actualTheme, setActualTheme] = useState<'light' | 'dark'>(() => {
+    if (theme === 'system') {
+      return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
     }
+    return theme;
+  });
+
+  // Listen to OS/PC theme changes and apply to DOM
+  useEffect(() => {
+    const updateTheme = () => {
+      let active: 'light' | 'dark' = 'light';
+      if (theme === 'system') {
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        active = isDark ? 'dark' : 'light';
+      } else {
+        active = theme;
+      }
+
+      setActualTheme(active);
+
+      const root = document.documentElement;
+      if (active === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+
+    updateTheme();
     localStorage.setItem('meplus_theme', theme);
+
+    // Watch for OS theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (theme === 'system') {
+        updateTheme();
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
   }, [theme]);
 
   const toggleTheme = () => {
-    setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'));
+    setThemeState(prev => {
+      if (prev === 'dark') return 'light';
+      return 'dark';
+    });
   };
 
   const setTheme = (newTheme: Theme) => {
@@ -36,7 +81,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, actualTheme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
