@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -26,6 +26,22 @@ export const SettingsView: React.FC = () => {
   const [smsAlerts, setSmsAlerts] = useState(user?.notificationSettings?.sms ?? true);
   const [browserAlerts, setBrowserAlerts] = useState(user?.notificationSettings?.browser ?? true);
   const [soundAlerts, setSoundAlerts] = useState(user?.notificationSettings?.sound ?? true);
+
+  // Sync state when active user updates
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setTitle(user.title || '');
+      setBio(user.bio || '');
+      if (user.avatar) setAvatar(user.avatar);
+      if (user.notificationSettings) {
+        setEmailAlerts(user.notificationSettings.email ?? true);
+        setSmsAlerts(user.notificationSettings.sms ?? true);
+        setBrowserAlerts(user.notificationSettings.browser ?? true);
+        setSoundAlerts(user.notificationSettings.sound ?? true);
+      }
+    }
+  }, [user]);
 
   const presetAvatars = [
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
@@ -57,13 +73,44 @@ export const SettingsView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Convert file to Base64 Data URL so it can be saved locally
+    // Convert file to optimized Base64 Data URL so it can be saved locally and synchronized
     const reader = new FileReader();
     reader.onload = event => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setAvatar(dataUrl);
-      }
+      const rawDataUrl = event.target?.result as string;
+      if (!rawDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 256;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          setAvatar(compressedDataUrl);
+        } else {
+          setAvatar(rawDataUrl);
+        }
+      };
+      img.onerror = () => {
+        setAvatar(rawDataUrl);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };

@@ -15,7 +15,8 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // Request logger for API calls
 app.use((req, res, next) => {
@@ -27,7 +28,7 @@ app.use((req, res, next) => {
 
 // Helper to get active userId from request
 function getReqUserId(req) {
-  const raw = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
+  const raw = req.query.userId || req.headers['x-user-id'] || req.body?.userId || req.body?.id;
   if (!raw) return 'usr-1';
   if (raw.includes('@')) return getDeterministicUserId(raw);
   return raw;
@@ -204,16 +205,32 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 app.put('/api/auth/profile', (req, res) => {
-  const updates = req.body;
+  const updates = req.body || {};
   const db = readDb();
-  db.user = { ...(db.user || {}), ...updates };
-  // Update in users array as well
-  if (db.users && db.user) {
-    const idx = db.users.findIndex(u => u.id === db.user.id);
-    if (idx !== -1) {
-      db.users[idx] = { ...db.users[idx], ...updates };
-    }
+  const users = db.users || [];
+
+  const targetId = updates.id || updates.userId || req.query.userId || req.headers['x-user-id'] || db.user?.id;
+  const targetEmail = (updates.email || req.query.email || db.user?.email || '').trim().toLowerCase();
+
+  let targetIdx = -1;
+  if (targetId) {
+    targetIdx = users.findIndex(u => u.id === targetId);
   }
+  if (targetIdx === -1 && targetEmail) {
+    targetIdx = users.findIndex(u => u.email.toLowerCase() === targetEmail);
+  }
+
+  if (targetIdx !== -1) {
+    users[targetIdx] = { ...users[targetIdx], ...updates };
+    const { password: _, ...safeUser } = users[targetIdx];
+    db.users = users;
+    db.user = safeUser;
+    writeDb(db);
+    return res.json({ success: true, user: safeUser });
+  }
+
+  // Fallback
+  db.user = { ...(db.user || {}), ...updates };
   writeDb(db);
   res.json({ success: true, user: db.user });
 });

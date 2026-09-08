@@ -858,12 +858,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const authenticatedUser: UserProfile = {
           ...res.user,
           id: deterministicId,
+          avatar: res.user.avatar || initialUser.avatar,
         };
         setUser(authenticatedUser);
-        // Ensure user is synced in registeredUsers local directory as well
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authenticatedUser));
+
+        // Ensure user is synced in registeredUsers local directory with latest avatar and profile
         setRegisteredUsers(prev => {
-          if (!prev.some(u => u.email.toLowerCase() === normalizedEmail)) {
-            return [
+          const exists = prev.some(u => u.email.toLowerCase() === normalizedEmail);
+          let next: RegisteredAccount[];
+          if (!exists) {
+            next = [
               ...prev,
               {
                 id: deterministicId,
@@ -871,11 +876,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 email: normalizedEmail,
                 password,
                 title: res.user.title,
+                avatar: res.user.avatar || initialUser.avatar,
+                bio: res.user.bio,
+                hourlyRate: res.user.hourlyRate,
+                currency: res.user.currency,
               },
             ];
+          } else {
+            next = prev.map(u =>
+              u.email.toLowerCase() === normalizedEmail
+                ? {
+                    ...u,
+                    id: deterministicId,
+                    name: res.user.name || u.name,
+                    title: res.user.title || u.title,
+                    avatar: res.user.avatar || u.avatar || initialUser.avatar,
+                    bio: res.user.bio ?? u.bio,
+                    hourlyRate: res.user.hourlyRate ?? u.hourlyRate,
+                    currency: res.user.currency ?? u.currency,
+                  }
+                : u
+            );
           }
-          return prev.map(u => (u.email.toLowerCase() === normalizedEmail ? { ...u, id: deterministicId } : u));
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(next));
+          return next;
         });
+
         showToast({
           title: 'Welcome back!',
           message: `Signed in as ${res.user.name || res.user.email}`,
@@ -925,6 +951,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setUser(authenticatedUser);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authenticatedUser));
     showToast({
       title: 'Welcome back!',
       message: `Signed in as ${authenticatedUser.name}`,
@@ -1124,11 +1151,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUserProfile = (profile: Partial<UserProfile>) => {
-    setUser(prev => (prev ? { ...prev, ...profile } : null));
-    api.updateProfile(profile).catch(() => {});
+    if (!user) return;
+    const updatedUser: UserProfile = { ...user, ...profile };
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+    // Update in registered users list so it persists across logouts and logins
+    setRegisteredUsers(prev => {
+      const next = prev.map(u => {
+        if (
+          u.id === user.id ||
+          (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase())
+        ) {
+          return {
+            ...u,
+            name: profile.name !== undefined ? profile.name : u.name,
+            title: profile.title !== undefined ? profile.title : u.title,
+            avatar: profile.avatar !== undefined ? profile.avatar : u.avatar,
+            bio: profile.bio !== undefined ? profile.bio : u.bio,
+            hourlyRate: profile.hourlyRate !== undefined ? profile.hourlyRate : u.hourlyRate,
+            currency: profile.currency !== undefined ? profile.currency : u.currency,
+          };
+        }
+        return u;
+      });
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(next));
+      return next;
+    });
+
+    api.updateProfile({ ...profile, id: user.id, email: user.email }, user.id).catch(err => {
+      console.warn('Could not sync profile to backend:', err);
+    });
+
     showToast({
       title: 'Profile Updated',
-      message: 'Your personal settings have been saved.',
+      message: 'Your personal settings and profile photo have been saved.',
       type: 'success',
     });
   };

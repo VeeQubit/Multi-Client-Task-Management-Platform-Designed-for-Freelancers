@@ -332,6 +332,60 @@ async function runAuthTestSuite() {
     }
   });
 
+  // --- Test 17: User Avatar & Profile Updates Persist Across Logout & Re-Login ---
+  await test('Verify custom profile avatar & bio persist across logout & login', async () => {
+    const avatarTestEmail = `avatar_${Date.now()}@example.com`;
+    const avatarPassword = 'AvatarPassword2026!';
+    const customAvatar = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkWP+/HgAEtAH5s+OuvwAAAABJRU5ErkJggg==';
+
+    // 1. Register new user
+    const regRes = await fetch(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Avatar Test User',
+        email: avatarTestEmail,
+        password: avatarPassword,
+        profession: 'Motion Designer',
+      }),
+    });
+    if (regRes.status !== 201) throw new Error('Registration failed');
+    const regData = await regRes.json();
+    const userId = regData.user.id;
+
+    // 2. Update profile with custom uploaded avatar and bio
+    const updateRes = await fetch(`${BASE}/auth/profile?userId=${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: userId,
+        email: avatarTestEmail,
+        avatar: customAvatar,
+        bio: 'Updated custom bio for freelancer.',
+      }),
+    });
+    if (updateRes.status !== 200) throw new Error('Profile update failed');
+
+    // 3. Simulate Logout and Login
+    const loginRes = await fetch(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: avatarTestEmail,
+        password: avatarPassword,
+      }),
+    });
+    if (loginRes.status !== 200) throw new Error('Login failed');
+    const loginData = await loginRes.json();
+
+    if (loginData.user.avatar !== customAvatar) {
+      throw new Error('Avatar was not persisted after login!');
+    }
+    if (loginData.user.bio !== 'Updated custom bio for freelancer.') {
+      throw new Error('Bio was not persisted after login!');
+    }
+  });
+
   console.log(`\n${colors.bold}------------------------------------------------------${colors.reset}`);
   console.log(`  ${colors.bold}SUMMARY:${colors.reset} Total: ${passed + failed} | Passed: ${colors.green}${passed}${colors.reset} | Failed: ${colors.red}${failed}${colors.reset}`);
   console.log(`${colors.bold}------------------------------------------------------${colors.reset}\n`);

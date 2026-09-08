@@ -58,11 +58,14 @@ export const api = {
 
   getCurrentUser: () => fetchJson<{ user: UserProfile | null }>('/auth/me'),
 
-  updateProfile: (profile: Partial<UserProfile>) =>
-    fetchJson<{ success: boolean; user: UserProfile }>('/auth/profile', {
-      method: 'PUT',
-      body: JSON.stringify(profile),
-    }),
+  updateProfile: (profile: Partial<UserProfile>, userId?: string) =>
+    fetchJson<{ success: boolean; user: UserProfile }>(
+      userId ? `/auth/profile?userId=${encodeURIComponent(userId)}` : '/auth/profile',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ ...profile, userId }),
+      }
+    ),
 
   // Clients
   getClients: (userId?: string) =>
