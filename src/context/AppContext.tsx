@@ -22,6 +22,7 @@ import {
   initialInvoices,
   initialNotifications,
 } from '../data/initialData';
+import { api } from '../services/api';
 
 export interface ToastMessage {
   id: string;
@@ -223,6 +224,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<Invoice | null>(null);
   const [isTimeLogModalOpen, setIsTimeLogModalOpen] = useState(false);
 
+  // Sync initial state from backend REST API on mount
+  useEffect(() => {
+    Promise.all([
+      api.getClients().catch(() => null),
+      api.getProjects().catch(() => null),
+      api.getTasks().catch(() => null),
+      api.getTimeEntries().catch(() => null),
+      api.getInvoices().catch(() => null),
+      api.getNotifications().catch(() => null),
+    ]).then(([apiClients, apiProjects, apiTasks, apiTime, apiInvoices, apiNotifs]) => {
+      if (apiClients && apiClients.length > 0) setClients(apiClients);
+      if (apiProjects && apiProjects.length > 0) setProjects(apiProjects);
+      if (apiTasks && apiTasks.length > 0) setTasks(apiTasks);
+      if (apiTime && apiTime.length > 0) setTimeEntries(apiTime);
+      if (apiInvoices && apiInvoices.length > 0) setInvoices(apiInvoices);
+      if (apiNotifs && apiNotifs.length > 0) setNotifications(apiNotifs);
+    });
+  }, []);
+
   // Sync state changes to localStorage
   useEffect(() => {
     if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
@@ -329,11 +349,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User Actions
   const login = (email: string) => {
-    setUser({
+    const loggedUser = {
       ...initialUser,
       email,
       name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    });
+    };
+    setUser(loggedUser);
+    api.login(email).catch(() => {});
     showToast({
       title: 'Welcome back!',
       message: `Signed in as ${email}`,
@@ -343,12 +365,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const register = (name: string, email: string, title?: string) => {
-    setUser({
+    const newUserObj = {
       ...initialUser,
       name,
       email,
       title: title || 'Independent Professional & Freelancer',
-    });
+    };
+    setUser(newUserObj);
+    api.register(name, email, title).catch(() => {});
     showToast({
       title: 'Account Created!',
       message: `Welcome to Me Plus, ${name}!`,
@@ -359,6 +383,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginDemoUser = () => {
     setUser(initialUser);
+    api.login(initialUser.email).catch(() => {});
     showToast({
       title: 'Demo Mode Activated',
       message: 'Logged in as Alex Rivera with sample projects & clients.',
@@ -377,6 +402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserProfile = (profile: Partial<UserProfile>) => {
     setUser(prev => (prev ? { ...prev, ...profile } : null));
+    api.updateProfile(profile).catch(() => {});
     showToast({
       title: 'Profile Updated',
       message: 'Your personal settings have been saved.',
@@ -393,12 +419,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalBilled: 0,
     };
     setClients(prev => [newClient, ...prev]);
+    api.createClient(newClientData).catch(() => {});
     showToast({
       title: 'Client Added',
       message: `${newClient.name} (${newClient.company}) has been added.`,
       type: 'success',
       undoAction: () => {
         setClients(prev => prev.filter(c => c.id !== newClient.id));
+        api.deleteClient(newClient.id).catch(() => {});
       },
       undoLabel: 'Undo',
     });
@@ -407,6 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateClient = (id: string, updates: Partial<Client>) => {
     setClients(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
+    api.updateClient(id, updates).catch(() => {});
     showToast({
       title: 'Client Updated',
       message: 'Client information has been updated.',
@@ -419,12 +448,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!clientToDelete) return;
 
     setClients(prev => prev.filter(c => c.id !== id));
+    api.deleteClient(id).catch(() => {});
     showToast({
       title: 'Client Deleted',
       message: `${clientToDelete.name} was removed.`,
       type: 'warning',
       undoAction: () => {
         setClients(prev => [clientToDelete, ...prev]);
+        api.createClient(clientToDelete).catch(() => {});
       },
       undoLabel: 'Restore Client',
     });
@@ -458,12 +489,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString().split('T')[0],
     };
     setProjects(prev => [newProject, ...prev]);
+    api.createProject(projectData).catch(() => {});
     showToast({
       title: 'Project Created',
       message: `Project "${newProject.title}" was launched.`,
       type: 'success',
       undoAction: () => {
         setProjects(prev => prev.filter(p => p.id !== newProject.id));
+        api.deleteProject(newProject.id).catch(() => {});
       },
       undoLabel: 'Undo',
     });
@@ -472,6 +505,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+    api.updateProject(id, updates).catch(() => {});
     showToast({
       title: 'Project Saved',
       message: 'Project details have been updated.',
@@ -483,12 +517,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const projToDelete = projects.find(p => p.id === id);
     if (!projToDelete) return;
     setProjects(prev => prev.filter(p => p.id !== id));
+    api.deleteProject(id).catch(() => {});
     showToast({
       title: 'Project Deleted',
       message: `Project "${projToDelete.title}" was deleted.`,
       type: 'warning',
       undoAction: () => {
         setProjects(prev => [projToDelete, ...prev]);
+        api.createProject(projToDelete).catch(() => {});
       },
       undoLabel: 'Restore',
     });
@@ -496,12 +532,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const archiveProject = (id: string) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, status: 'archived' } : p)));
+    api.updateProject(id, { status: 'archived' }).catch(() => {});
     showToast({
       title: 'Project Archived',
       message: 'Project has been moved to archive.',
       type: 'info',
       undoAction: () => {
         setProjects(prev => prev.map(p => (p.id === id ? { ...p, status: 'in-progress' } : p)));
+        api.updateProject(id, { status: 'in-progress' }).catch(() => {});
       },
       undoLabel: 'Unarchive',
     });
@@ -509,6 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const restoreProject = (id: string) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, status: 'in-progress' } : p)));
+    api.updateProject(id, { status: 'in-progress' }).catch(() => {});
     showToast({
       title: 'Project Restored',
       message: 'Project moved back to active status.',
@@ -529,6 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedTasks = [newTask, ...tasks];
     setTasks(updatedTasks);
     recalculateProjectProgress(newTask.projectId, updatedTasks);
+    api.createTask(taskData).catch(() => {});
 
     showToast({
       title: 'Task Created',
@@ -536,6 +576,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'success',
       undoAction: () => {
         setTasks(prev => prev.filter(t => t.id !== newTask.id));
+        api.deleteTask(newTask.id).catch(() => {});
       },
       undoLabel: 'Undo',
     });
@@ -549,6 +590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (target) recalculateProjectProgress(target.projectId, next);
       return next;
     });
+    api.updateTask(id, updates).catch(() => {});
     showToast({
       title: 'Task Updated',
       message: 'Task changes saved successfully.',
@@ -562,6 +604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextTasks = tasks.filter(t => t.id !== id);
     setTasks(nextTasks);
     recalculateProjectProgress(taskToDelete.projectId, nextTasks);
+    api.deleteTask(id).catch(() => {});
 
     showToast({
       title: 'Task Removed',
@@ -570,6 +613,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       undoAction: () => {
         setTasks(prev => [taskToDelete, ...prev]);
         recalculateProjectProgress(taskToDelete.projectId, [...nextTasks, taskToDelete]);
+        api.createTask(taskToDelete).catch(() => {});
       },
       undoLabel: 'Undo Delete',
     });
@@ -591,17 +635,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    const completedAt = newStatus === 'done' ? new Date().toISOString().split('T')[0] : undefined;
     const updatedTasks = tasks.map(t =>
       t.id === id
         ? {
             ...t,
             status: newStatus,
-            completedAt: newStatus === 'done' ? new Date().toISOString().split('T')[0] : undefined,
+            completedAt,
           }
         : t
     );
     setTasks(updatedTasks);
     recalculateProjectProgress(task.projectId, updatedTasks);
+    api.updateTask(id, { status: newStatus, completedAt }).catch(() => {});
 
     showToast({
       title: `Task Moved to ${newStatus.replace('-', ' ').toUpperCase()}`,
@@ -611,6 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const revertedTasks = tasks.map(t => (t.id === id ? { ...t, status: oldStatus } : t));
         setTasks(revertedTasks);
         recalculateProjectProgress(task.projectId, revertedTasks);
+        api.updateTask(id, { status: oldStatus }).catch(() => {});
       },
       undoLabel: 'Undo Move',
     });
@@ -706,6 +753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     resetTimer();
+    api.createTimeEntry(newEntry).catch(() => {});
 
     showToast({
       title: 'Time Logged Successfully',
@@ -732,6 +780,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `time-${Date.now()}`,
     };
     setTimeEntries(prev => [newEntry, ...prev]);
+    api.createTimeEntry(entryData).catch(() => {});
 
     // Update project budget spent
     const earned = Math.round((newEntry.durationSeconds / 3600) * newEntry.hourlyRate);
@@ -750,6 +799,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const entry = timeEntries.find(e => e.id === id);
     if (!entry) return;
     setTimeEntries(prev => prev.filter(e => e.id !== id));
+    api.deleteTimeEntry(id).catch(() => {});
     showToast({
       title: 'Time Log Removed',
       message: 'Time entry was removed from records.',
@@ -765,6 +815,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString().split('T')[0],
     };
     setInvoices(prev => [newInvoice, ...prev]);
+    api.createInvoice(invoiceData).catch(() => {});
 
     // If paid, add to client total billed
     if (newInvoice.status === 'paid') {
@@ -785,6 +836,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateInvoice = (id: string, updates: Partial<Invoice>) => {
     setInvoices(prev => prev.map(inv => (inv.id === id ? { ...inv, ...updates } : inv)));
+    api.updateInvoice(id, updates).catch(() => {});
     showToast({
       title: 'Invoice Updated',
       message: 'Invoice details saved.',
@@ -796,11 +848,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const inv = invoices.find(i => i.id === id);
     if (!inv) return;
     setInvoices(prev => prev.filter(i => i.id !== id));
+    api.deleteInvoice(id).catch(() => {});
     showToast({
       title: 'Invoice Deleted',
       message: `${inv.invoiceNumber} was removed.`,
       type: 'warning',
-      undoAction: () => setInvoices(prev => [inv, ...prev]),
+      undoAction: () => {
+        setInvoices(prev => [inv, ...prev]);
+        api.createInvoice(inv).catch(() => {});
+      },
       undoLabel: 'Restore',
     });
   };
@@ -810,6 +866,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!inv) return;
     const oldStatus = inv.status;
     setInvoices(prev => prev.map(i => (i.id === id ? { ...i, status } : i)));
+    api.updateInvoice(id, { status }).catch(() => {});
 
     if (status === 'paid' && oldStatus !== 'paid') {
       setClients(prev =>
@@ -832,6 +889,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Notifications
   const markNotificationAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    api.markNotificationRead(id).catch(() => {});
   };
 
   const markAllNotificationsAsRead = () => {
@@ -858,6 +916,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearAllNotifications = () => {
     setNotifications([]);
+    api.clearNotifications().catch(() => {});
   };
 
   const unreadNotificationsCount = notifications.filter(n => !n.read).length;
@@ -881,6 +940,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem(STORAGE_KEYS.INVOICES);
     localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_TIMER);
+
+    api.resetData().catch(() => {});
 
     showToast({
       title: 'Reset to Demo Data',

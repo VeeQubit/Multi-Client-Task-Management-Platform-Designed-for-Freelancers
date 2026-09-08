@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import {
   Sparkles,
   Send,
@@ -141,18 +142,31 @@ export const AiAssistantModal: React.FC = () => {
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI thinking and response
-    setTimeout(() => {
-      const aiReplyText = generateAiReply(query);
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: aiReplyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 700);
+    api.sendAiMessage(query)
+      .then(res => {
+        const aiMsg: ChatMessage = {
+          id: `ai-${Date.now()}`,
+          sender: 'ai',
+          text: res.reply || generateAiReply(query),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages(prev => [...prev, aiMsg]);
+        setIsTyping(false);
+      })
+      .catch(() => {
+        // Fallback to client-side generative response
+        setTimeout(() => {
+          const aiReplyText = generateAiReply(query);
+          const aiMsg: ChatMessage = {
+            id: `ai-${Date.now()}`,
+            sender: 'ai',
+            text: aiReplyText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages(prev => [...prev, aiMsg]);
+          setIsTyping(false);
+        }, 500);
+      });
   };
 
   const handleQuickPrompt = (promptText: string) => {
@@ -168,17 +182,30 @@ export const AiAssistantModal: React.FC = () => {
       setInputMessage('');
       setIsTyping(true);
 
-      setTimeout(() => {
-        const aiReplyText = generateAiReply(promptText);
-        const aiMsg: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          sender: 'ai',
-          text: aiReplyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages(prev => [...prev, aiMsg]);
-        setIsTyping(false);
-      }, 700);
+      api.sendAiMessage(promptText)
+        .then(res => {
+          const aiMsg: ChatMessage = {
+            id: `ai-${Date.now()}`,
+            sender: 'ai',
+            text: res.reply || generateAiReply(promptText),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages(prev => [...prev, aiMsg]);
+          setIsTyping(false);
+        })
+        .catch(() => {
+          setTimeout(() => {
+            const aiReplyText = generateAiReply(promptText);
+            const aiMsg: ChatMessage = {
+              id: `ai-${Date.now()}`,
+              sender: 'ai',
+              text: aiReplyText,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            setMessages(prev => [...prev, aiMsg]);
+            setIsTyping(false);
+          }, 500);
+        });
     }, 50);
   };
 
