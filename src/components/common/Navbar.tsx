@@ -1,0 +1,371 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
+import { Logo } from './Logo';
+import { NotificationCenter } from './NotificationCenter';
+import {
+  Search,
+  Plus,
+  Play,
+  Pause,
+  Square,
+  Moon,
+  Sun,
+  Bell,
+  Sparkles,
+  User,
+  LogOut,
+  FolderKanban,
+  CheckSquare,
+  Users,
+  FileText,
+  Clock,
+  Menu,
+} from 'lucide-react';
+
+interface NavbarProps {
+  onToggleMobileSidebar: () => void;
+  onOpenAuthModal: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  onToggleMobileSidebar,
+  onOpenAuthModal,
+}) => {
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    activeTimer,
+    pauseTimer,
+    resumeTimer,
+    stopTimer,
+    projects,
+    unreadNotificationsCount,
+    setIsCommandPaletteOpen,
+    setIsAiModalOpen,
+    setIsTaskModalOpen,
+    setIsProjectModalOpen,
+    setIsClientModalOpen,
+    setIsInvoiceModalOpen,
+    setIsTimeLogModalOpen,
+    setSelectedTaskForEdit,
+    setSelectedProjectForEdit,
+    setSelectedClientForEdit,
+    setSelectedInvoiceForEdit,
+  } = useApp();
+
+  const { theme, toggleTheme } = useTheme();
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  const quickAddRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Live real-time ticking clock
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (quickAddRef.current && !quickAddRef.current.contains(event.target as Node)) {
+        setIsQuickAddOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const formatTimer = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
+  };
+
+  const timerProject = projects.find(p => p.id === activeTimer.projectId);
+
+  const formattedLiveTime = currentTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const formattedLiveDate = currentTime.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  return (
+    <header className="sticky top-0 z-30 w-full h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-4 md:px-6 flex items-center justify-between transition-colors shadow-sm shrink-0">
+      {/* Left: Mobile Menu & Logo */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggleMobileSidebar}
+          className="lg:hidden p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+          aria-label="Toggle menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <Logo size="md" />
+
+        {/* Global Search Omni Bar Trigger (Ctrl+K) */}
+        <button
+          onClick={() => setIsCommandPaletteOpen(true)}
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 ml-4 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-all group cursor-pointer"
+        >
+          <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+          <span>Search or jump to...</span>
+          <kbd className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200 dark:border-slate-700 ml-2">
+            Ctrl K
+          </kbd>
+        </button>
+      </div>
+
+      {/* Middle: Live Clock & Active Stopwatch Widget */}
+      <div className="flex items-center gap-3">
+        {/* Live Real-Time Clock Display */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/70 text-slate-700 dark:text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {formattedLiveDate}
+          </span>
+          <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+            {formattedLiveTime}
+          </span>
+        </div>
+
+        {/* Active Timer Pill */}
+        {activeTimer.elapsedSeconds > 0 || activeTimer.isRunning ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse-subtle">
+            <span className="relative flex h-2.5 w-2.5">
+              {activeTimer.isRunning && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#25D366] opacity-75" />
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                  activeTimer.isRunning ? 'bg-[#25D366]' : 'bg-amber-500'
+                }`}
+              />
+            </span>
+
+            <div className="hidden lg:flex flex-col text-left">
+              <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
+                {timerProject ? timerProject.title : 'Active Timer'}
+              </span>
+            </div>
+
+            <span className="font-mono font-bold text-xs md:text-sm text-emerald-800 dark:text-emerald-300">
+              {formatTimer(activeTimer.elapsedSeconds)}
+            </span>
+
+            <div className="flex items-center gap-1 ml-1">
+              {activeTimer.isRunning ? (
+                <button
+                  onClick={pauseTimer}
+                  title="Pause Timer"
+                  className="p-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
+                >
+                  <Pause className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  onClick={resumeTimer}
+                  title="Resume Timer"
+                  className="p-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              <button
+                onClick={stopTimer}
+                title="Stop & Log Time to Project"
+                className="p-1 rounded-full text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/80 transition-colors cursor-pointer"
+              >
+                <Square className="w-3.5 h-3.5 fill-rose-600" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsTimeLogModalOpen(true)}
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:border-slate-700 cursor-pointer"
+          >
+            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Track Time</span>
+          </button>
+        )}
+      </div>
+
+      {/* Right: Quick Add, AI Copilot, Notifications, Theme, User */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Quick Add Button in WhatsApp Teal */}
+        <div className="relative" ref={quickAddRef}>
+          <button
+            onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-[#128C7E] hover:from-emerald-700 hover:to-[#075E54] shadow-md shadow-emerald-700/20 active:scale-95 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden md:inline">Quick Add</span>
+          </button>
+
+          {isQuickAddOpen && (
+            <div className="absolute right-0 top-11 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-slide-up">
+              <button
+                onClick={() => {
+                  setSelectedTaskForEdit(null);
+                  setIsTaskModalOpen(true);
+                  setIsQuickAddOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                <span>New Task</span>
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedProjectForEdit(null);
+                  setIsProjectModalOpen(true);
+                  setIsQuickAddOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <FolderKanban className="w-4 h-4 text-teal-600" />
+                <span>New Project</span>
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedClientForEdit(null);
+                  setIsClientModalOpen(true);
+                  setIsQuickAddOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <Users className="w-4 h-4 text-emerald-600" />
+                <span>New Client</span>
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedInvoiceForEdit(null);
+                  setIsInvoiceModalOpen(true);
+                  setIsQuickAddOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-lg transition-colors text-left cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-amber-500" />
+                <span>New Invoice</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* AI Copilot Button */}
+        <button
+          onClick={() => setIsAiModalOpen(true)}
+          title="Me Plus AI Assistant"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+          <span className="hidden sm:inline">AI Copilot</span>
+        </button>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+          className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+        </button>
+
+        {/* Notification Bell with Badge */}
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            title="Notifications & Deadline Alerts"
+            className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative cursor-pointer"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white font-black text-[9px] rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+
+          <NotificationCenter
+            isOpen={isNotificationsOpen}
+            onClose={() => setIsNotificationsOpen(false)}
+          />
+        </div>
+
+        {/* User Profile Avatar / Sign Out */}
+        {isAuthenticated && user ? (
+          <div className="relative ml-1" ref={userMenuRef}>
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-8 h-8 rounded-xl object-cover ring-2 ring-emerald-500/40"
+              />
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-12 w-60 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-slide-up">
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    {user.name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {user.email}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    {user.title}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    logout();
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors text-left cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onOpenAuthModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 rounded-xl transition-all cursor-pointer"
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </button>
+        )}
+      </div>
+    </header>
+  );
+};

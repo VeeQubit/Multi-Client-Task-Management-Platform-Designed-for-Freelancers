@@ -1,0 +1,300 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { Project, ProjectStatus } from '../../types';
+import { ProjectCard } from './ProjectCard';
+import { ProjectDetailModal } from './ProjectDetailModal';
+import { ProjectModal } from './ProjectModal';
+import {
+  FolderKanban,
+  Plus,
+  Search,
+  Filter,
+  LayoutGrid,
+  List,
+  Calendar,
+  DollarSign,
+  Edit2,
+  Trash2,
+  Play,
+  Archive,
+} from 'lucide-react';
+
+export const ProjectListView: React.FC = () => {
+  const {
+    projects,
+    clients,
+    tasks,
+    setIsProjectModalOpen,
+    setSelectedProjectForEdit,
+    deleteProject,
+    startTimer,
+  } = useApp();
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | ProjectStatus>('all');
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [inspectedProject, setInspectedProject] = useState<Project | null>(null);
+
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch =
+      project.title.toLowerCase().includes(search.toLowerCase()) ||
+      project.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
+    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+    const matchesClient = clientFilter === 'all' || project.clientId === clientFilter;
+    return matchesSearch && matchesStatus && matchesClient;
+  });
+
+  const handleEdit = (project: Project) => {
+    setSelectedProjectForEdit(project);
+    setIsProjectModalOpen(true);
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              Project Hub
+            </h1>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+              {projects.length} Total
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Organize multi-client deliverables, budgets, and milestone progress.
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            setSelectedProjectForEdit(null);
+            setIsProjectModalOpen(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-[#128C7E] hover:from-emerald-700 hover:to-[#075E54] text-white text-xs font-bold shadow-md shadow-emerald-700/25 active:scale-95 transition-all self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Project</span>
+        </button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search projects by title or tech tag..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs md:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+
+        {/* Client & Status Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={clientFilter}
+            onChange={e => setClientFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="all">All Clients ({clients.length})</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.company}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
+            {(['all', 'in-progress', 'planning', 'completed'] as const).map(st => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1.5 rounded-lg capitalize transition-all ${
+                  statusFilter === st
+                    ? 'bg-white dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {st.replace('-', ' ')}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-lg ${
+                viewMode === 'grid'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                  : 'hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg ${
+                viewMode === 'table'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                  : 'hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Projects Display */}
+      {filteredProjects.length === 0 ? (
+        <div className="py-16 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+          <FolderKanban className="w-12 h-12 mx-auto text-slate-400 mb-3 opacity-50" />
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            No projects matched your filters
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Try adjusting your search terms or create a new project.
+          </p>
+          <button
+            onClick={() => {
+              setSearch('');
+              setStatusFilter('all');
+              setClientFilter('all');
+            }}
+            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100"
+          >
+            Clear Filters
+          </button>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredProjects.map(project => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onView={p => setInspectedProject(p)}
+              onEdit={handleEdit}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
+              <tr>
+                <th className="py-3.5 px-4">Project Title</th>
+                <th className="py-3.5 px-4">Client</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Progress</th>
+                <th className="py-3.5 px-4">Deadline</th>
+                <th className="py-3.5 px-4">Budget</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {filteredProjects.map(project => {
+                const client = clients.find(c => c.id === project.clientId);
+                return (
+                  <tr
+                    key={project.id}
+                    onClick={() => setInspectedProject(project)}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
+                  >
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-slate-900 dark:text-white">
+                        {project.title}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {project.tags.join(', ')}
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4 font-semibold text-slate-700 dark:text-slate-300">
+                      {client?.company || 'Direct'}
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          project.status === 'completed'
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                            : project.status === 'in-progress'
+                            ? 'bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {project.status.replace('-', ' ')}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-600 rounded-full"
+                            style={{ width: `${project.progress}%` }}
+                          />
+                        </div>
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {project.progress}%
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                      {project.deadline}
+                    </td>
+
+                    <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-slate-200">
+                      ${project.budget.toLocaleString()}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => startTimer(project.id, project.clientId, undefined, `Working on ${project.title}`)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                          title="Start Timer"
+                        >
+                          <Play className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(project)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete ${project.title}?`)) deleteProject(project.id);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modals */}
+      <ProjectDetailModal
+        project={inspectedProject}
+        isOpen={!!inspectedProject}
+        onClose={() => setInspectedProject(null)}
+        onEdit={handleEdit}
+      />
+      <ProjectModal />
+    </div>
+  );
+};
