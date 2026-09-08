@@ -130,23 +130,40 @@ export const ClientListView: React.FC = () => {
 
       {/* Clients Display */}
       {filteredClients.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
-          <Users className="w-12 h-12 mx-auto text-slate-400 mb-3 opacity-50" />
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-            No clients found
+        <div className="py-16 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 p-6">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
+            <Users className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+            {clients.length === 0 ? 'No Clients Added Yet' : 'No Matching Clients Found'}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Try resetting your search query or add a new client to get started.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            {clients.length === 0
+              ? 'Add your first client profile with custom hourly rates, contact channels, and billing notes to start tracking projects.'
+              : 'Try resetting your search query or filter to see your client profiles.'}
           </p>
-          <button
-            onClick={() => {
-              setSearch('');
-              setStatusFilter('all');
-            }}
-            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100"
-          >
-            Clear Filters
-          </button>
+          {clients.length === 0 ? (
+            <button
+              onClick={() => {
+                setSelectedClientForEdit(null);
+                setIsClientModalOpen(true);
+              }}
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-[#128C7E] text-white text-xs font-bold shadow-lg shadow-emerald-700/25 active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Your First Client</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('all');
+              }}
+              className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -65,7 +65,8 @@ export const api = {
     }),
 
   // Clients
-  getClients: () => fetchJson<Client[]>('/clients'),
+  getClients: (userId?: string) =>
+    fetchJson<Client[]>(userId ? `/clients?userId=${encodeURIComponent(userId)}` : '/clients'),
   createClient: (client: Omit<Client, 'id' | 'createdAt' | 'totalBilled'>) =>
     fetchJson<Client>('/clients', {
       method: 'POST',
@@ -82,7 +83,8 @@ export const api = {
     }),
 
   // Projects
-  getProjects: () => fetchJson<Project[]>('/projects'),
+  getProjects: (userId?: string) =>
+    fetchJson<Project[]>(userId ? `/projects?userId=${encodeURIComponent(userId)}` : '/projects'),
   createProject: (project: Omit<Project, 'id' | 'createdAt' | 'spent' | 'progress'>) =>
     fetchJson<Project>('/projects', {
       method: 'POST',
@@ -99,7 +101,8 @@ export const api = {
     }),
 
   // Tasks
-  getTasks: () => fetchJson<Task[]>('/tasks'),
+  getTasks: (userId?: string) =>
+    fetchJson<Task[]>(userId ? `/tasks?userId=${encodeURIComponent(userId)}` : '/tasks'),
   createTask: (task: Omit<Task, 'id' | 'createdAt' | 'actualHours'>) =>
     fetchJson<Task>('/tasks', {
       method: 'POST',
@@ -116,7 +119,8 @@ export const api = {
     }),
 
   // Time Entries
-  getTimeEntries: () => fetchJson<TimeEntry[]>('/time-entries'),
+  getTimeEntries: (userId?: string) =>
+    fetchJson<TimeEntry[]>(userId ? `/time-entries?userId=${encodeURIComponent(userId)}` : '/time-entries'),
   createTimeEntry: (entry: Omit<TimeEntry, 'id'>) =>
     fetchJson<TimeEntry>('/time-entries', {
       method: 'POST',
@@ -128,7 +132,8 @@ export const api = {
     }),
 
   // Invoices
-  getInvoices: () => fetchJson<Invoice[]>('/invoices'),
+  getInvoices: (userId?: string) =>
+    fetchJson<Invoice[]>(userId ? `/invoices?userId=${encodeURIComponent(userId)}` : '/invoices'),
   createInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) =>
     fetchJson<Invoice>('/invoices', {
       method: 'POST',
@@ -145,7 +150,8 @@ export const api = {
     }),
 
   // Notifications
-  getNotifications: () => fetchJson<AppNotification[]>('/notifications'),
+  getNotifications: (userId?: string) =>
+    fetchJson<AppNotification[]>(userId ? `/notifications?userId=${encodeURIComponent(userId)}` : '/notifications'),
   markNotificationRead: (id: string) =>
     fetchJson<{ success: boolean }>(`/notifications/${id}/read`, {
       method: 'PUT',
@@ -165,4 +171,3 @@ export const api = {
   // Reset Data
   resetData: () => fetchJson<{ success: boolean }>('/reset', { method: 'POST' }),
 };
-

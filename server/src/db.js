@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, '../data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-// Initial seed data
+// Initial seed data with userId isolation
 export const initialSeed = {
   users: [
     {
@@ -30,14 +30,14 @@ export const initialSeed = {
     },
     {
       id: 'usr-demo',
-      name: 'Demo Freelancer',
+      name: 'Alex Rivera',
       email: 'demo@meplus.io',
-      password: 'demouser123',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
-      title: 'Full-Stack Developer',
-      hourlyRate: 75,
+      password: 'password123',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+      title: 'Senior Graphic & UI Designer',
+      hourlyRate: 65,
       currency: '$',
-      bio: 'Freelancer demo workspace account.',
+      bio: 'Specialized in building modern web interfaces, digital branding, and UI systems.',
       notificationSettings: {
         email: true,
         sms: true,
@@ -47,26 +47,11 @@ export const initialSeed = {
       },
     },
   ],
-  user: {
-    id: 'usr-1',
-    name: 'Alex Rivera',
-    email: 'alex.rivera@gmail.com',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
-    title: 'Senior Graphic & UI Designer',
-    hourlyRate: 65,
-    currency: '$',
-    bio: 'Specialized in building modern web interfaces, digital branding, and UI systems.',
-    notificationSettings: {
-      email: true,
-      sms: true,
-      browser: true,
-      sound: true,
-      deadlineReminderHours: 24,
-    },
-  },
+  user: null,
   clients: [
     {
       id: 'cli-1',
+      userId: 'usr-1',
       name: 'Sarah Jenkins',
       company: 'Sarah Jenkins',
       email: 'sarah.j@gmail.com',
@@ -81,6 +66,7 @@ export const initialSeed = {
     },
     {
       id: 'cli-2',
+      userId: 'usr-1',
       name: 'Marcus Vance',
       company: 'Marcus Vance',
       email: 'mvance@gmail.com',
@@ -95,6 +81,7 @@ export const initialSeed = {
     },
     {
       id: 'cli-3',
+      userId: 'usr-1',
       name: 'Elena Rostova',
       company: 'Elena Rostova',
       email: 'elena@gmail.com',
@@ -111,6 +98,7 @@ export const initialSeed = {
   projects: [
     {
       id: 'prj-1',
+      userId: 'usr-1',
       clientId: 'cli-1',
       title: 'Nova Design System & E-Commerce Landing',
       description: 'End-to-end design system, component library, and high-converting marketing landing pages.',
@@ -126,6 +114,7 @@ export const initialSeed = {
     },
     {
       id: 'prj-2',
+      userId: 'usr-1',
       clientId: 'cli-2',
       title: 'Pulse Financial Analytics Dashboard',
       description: 'Real-time crypto and fiat portfolio analytics with dark mode and CSV exports.',
@@ -141,6 +130,7 @@ export const initialSeed = {
     },
     {
       id: 'prj-3',
+      userId: 'usr-1',
       clientId: 'cli-3',
       title: 'EduVerse Interactive Student Portal',
       description: 'Gamified learning modules with responsive quiz interface and performance reports.',
@@ -158,6 +148,7 @@ export const initialSeed = {
   tasks: [
     {
       id: 'tsk-1',
+      userId: 'usr-1',
       projectId: 'prj-2',
       clientId: 'cli-2',
       title: 'Finalize Dark Theme Contrast & Color Tokens',
@@ -178,6 +169,7 @@ export const initialSeed = {
     },
     {
       id: 'tsk-2',
+      userId: 'usr-1',
       projectId: 'prj-1',
       clientId: 'cli-1',
       title: 'Build Interactive Checkout Form & Validation',
@@ -198,6 +190,7 @@ export const initialSeed = {
     },
     {
       id: 'tsk-3',
+      userId: 'usr-1',
       projectId: 'prj-1',
       clientId: 'cli-1',
       title: 'Design Hero Illustration & Icon Set',
@@ -217,6 +210,7 @@ export const initialSeed = {
     },
     {
       id: 'tsk-4',
+      userId: 'usr-1',
       projectId: 'prj-3',
       clientId: 'cli-3',
       title: 'Interactive Quiz Component Prototype',
@@ -240,6 +234,7 @@ export const initialSeed = {
   timeEntries: [
     {
       id: 'time-1',
+      userId: 'usr-1',
       projectId: 'prj-2',
       clientId: 'cli-2',
       date: '2026-09-02',
@@ -251,6 +246,7 @@ export const initialSeed = {
     },
     {
       id: 'time-2',
+      userId: 'usr-1',
       projectId: 'prj-1',
       clientId: 'cli-1',
       date: '2026-09-01',
@@ -262,6 +258,7 @@ export const initialSeed = {
     },
     {
       id: 'time-3',
+      userId: 'usr-1',
       projectId: 'prj-3',
       clientId: 'cli-3',
       date: '2026-08-31',
@@ -275,6 +272,7 @@ export const initialSeed = {
   invoices: [
     {
       id: 'inv-101',
+      userId: 'usr-1',
       invoiceNumber: 'INV-2026-001',
       clientId: 'cli-1',
       projectId: 'prj-1',
@@ -299,6 +297,7 @@ export const initialSeed = {
     },
     {
       id: 'inv-102',
+      userId: 'usr-1',
       invoiceNumber: 'INV-2026-002',
       clientId: 'cli-2',
       projectId: 'prj-2',
@@ -325,6 +324,7 @@ export const initialSeed = {
   notifications: [
     {
       id: 'notif-1',
+      userId: 'usr-1',
       title: 'Urgent Task Deadline Approaching',
       message: '"Finalize Dark Theme Contrast" is due today!',
       type: 'deadline',
@@ -336,6 +336,7 @@ export const initialSeed = {
     },
     {
       id: 'notif-2',
+      userId: 'usr-1',
       title: 'Invoice Payment Received',
       message: 'Sarah Jenkins paid INV-2026-001 ($3,937.50)',
       type: 'invoice',
@@ -381,9 +382,16 @@ export const writeDb = (data) => {
 };
 
 // Collection helpers
-export const getCollection = (collectionName) => {
+export const getCollection = (collectionName, userId) => {
   const db = readDb();
-  return db[collectionName] || [];
+  const items = db[collectionName] || [];
+  if (!userId) return items;
+  // If demo account (usr-1 or usr-demo), allow access to demo seed items as well
+  const isDemo = userId === 'usr-1' || userId === 'usr-demo';
+  return items.filter(item => {
+    if (isDemo) return item.userId === 'usr-1' || item.userId === 'usr-demo' || !item.userId;
+    return item.userId === userId;
+  });
 };
 
 export const saveCollection = (collectionName, items) => {

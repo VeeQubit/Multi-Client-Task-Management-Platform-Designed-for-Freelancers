@@ -11,7 +11,6 @@ import {
   InvoiceStatus,
   AppNotification,
   ActiveTimer,
-  PriorityLevel,
 } from '../types';
 import {
   initialUser,
@@ -144,13 +143,13 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   USER: 'meplus_user_v1',
   USERS: 'meplus_registered_users_v1',
-  CLIENTS: 'meplus_clients_v1',
-  PROJECTS: 'meplus_projects_v1',
-  TASKS: 'meplus_tasks_v1',
-  TIME_ENTRIES: 'meplus_time_entries_v1',
-  INVOICES: 'meplus_invoices_v1',
-  NOTIFICATIONS: 'meplus_notifications_v1',
   ACTIVE_TIMER: 'meplus_active_timer_v1',
+  CLIENTS_PREFIX: 'meplus_clients_user_',
+  PROJECTS_PREFIX: 'meplus_projects_user_',
+  TASKS_PREFIX: 'meplus_tasks_user_',
+  TIME_PREFIX: 'meplus_time_user_',
+  INVOICES_PREFIX: 'meplus_invoices_user_',
+  NOTIFS_PREFIX: 'meplus_notifs_user_',
 };
 
 interface RegisteredAccount {
@@ -190,6 +189,11 @@ const defaultRegisteredUsers: RegisteredAccount[] = [
   },
 ];
 
+function isDemoAccount(u: UserProfile | null | undefined): boolean {
+  if (!u) return false;
+  return u.id === 'usr-1' || u.id === 'usr-demo' || u.email === 'alex.rivera@gmail.com' || u.email === 'demo@meplus.io';
+}
+
 function safeGetStorage<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(key);
@@ -206,39 +210,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Registered Users Directory (for client-side auth verification fallback)
+  // Registered Users Directory
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredAccount[]>(() => {
     return safeGetStorage<RegisteredAccount[]>(STORAGE_KEYS.USERS, defaultRegisteredUsers);
   });
 
-  // User & Auth State - default to null (no user logged in initially)
+  // User & Auth State
   const [user, setUser] = useState<UserProfile | null>(() => {
     return safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
   });
 
-  // Data Collections
+  // Per-User Collections Initializers
   const [clients, setClients] = useState<Client[]>(() => {
-    return safeGetStorage<Client[]>(STORAGE_KEYS.CLIENTS, initialClients);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<Client[]>(`${STORAGE_KEYS.CLIENTS_PREFIX}${initial.id}`, initialClients);
+    }
+    return safeGetStorage<Client[]>(`${STORAGE_KEYS.CLIENTS_PREFIX}${initial.id}`, []);
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
-    return safeGetStorage<Project[]>(STORAGE_KEYS.PROJECTS, initialProjects);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<Project[]>(`${STORAGE_KEYS.PROJECTS_PREFIX}${initial.id}`, initialProjects);
+    }
+    return safeGetStorage<Project[]>(`${STORAGE_KEYS.PROJECTS_PREFIX}${initial.id}`, []);
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    return safeGetStorage<Task[]>(STORAGE_KEYS.TASKS, initialTasks);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<Task[]>(`${STORAGE_KEYS.TASKS_PREFIX}${initial.id}`, initialTasks);
+    }
+    return safeGetStorage<Task[]>(`${STORAGE_KEYS.TASKS_PREFIX}${initial.id}`, []);
   });
 
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() => {
-    return safeGetStorage<TimeEntry[]>(STORAGE_KEYS.TIME_ENTRIES, initialTimeEntries);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<TimeEntry[]>(`${STORAGE_KEYS.TIME_PREFIX}${initial.id}`, initialTimeEntries);
+    }
+    return safeGetStorage<TimeEntry[]>(`${STORAGE_KEYS.TIME_PREFIX}${initial.id}`, []);
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    return safeGetStorage<Invoice[]>(STORAGE_KEYS.INVOICES, initialInvoices);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<Invoice[]>(`${STORAGE_KEYS.INVOICES_PREFIX}${initial.id}`, initialInvoices);
+    }
+    return safeGetStorage<Invoice[]>(`${STORAGE_KEYS.INVOICES_PREFIX}${initial.id}`, []);
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    return safeGetStorage<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const initial = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (!initial) return [];
+    if (isDemoAccount(initial)) {
+      return safeGetStorage<AppNotification[]>(`${STORAGE_KEYS.NOTIFS_PREFIX}${initial.id}`, initialNotifications);
+    }
+    return safeGetStorage<AppNotification[]>(`${STORAGE_KEYS.NOTIFS_PREFIX}${initial.id}`, [
+      {
+        id: `notif-welcome-${initial.id}`,
+        userId: initial.id,
+        title: 'Welcome to Me Plus!',
+        message: `Hello ${initial.name}, your workspace is ready. Click "+ New Client" to start managing projects.`,
+        type: 'system',
+        priority: 'medium',
+        timestamp: 'Just now',
+        read: false,
+      },
+    ]);
   });
 
   // Active Stopwatch Timer
@@ -270,58 +315,137 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<Invoice | null>(null);
   const [isTimeLogModalOpen, setIsTimeLogModalOpen] = useState(false);
 
-  // Sync initial state from backend REST API on mount
-  useEffect(() => {
+  // Load and sync isolated data when active user changes
+  const loadUserData = useCallback((currentUser: UserProfile | null) => {
+    if (!currentUser) {
+      setClients([]);
+      setProjects([]);
+      setTasks([]);
+      setTimeEntries([]);
+      setInvoices([]);
+      setNotifications([]);
+      return;
+    }
+
+    const isDemo = isDemoAccount(currentUser);
+
+    // Initial local storage read for immediate rendering
+    const localClients = safeGetStorage<Client[]>(
+      `${STORAGE_KEYS.CLIENTS_PREFIX}${currentUser.id}`,
+      isDemo ? initialClients : []
+    );
+    const localProjects = safeGetStorage<Project[]>(
+      `${STORAGE_KEYS.PROJECTS_PREFIX}${currentUser.id}`,
+      isDemo ? initialProjects : []
+    );
+    const localTasks = safeGetStorage<Task[]>(
+      `${STORAGE_KEYS.TASKS_PREFIX}${currentUser.id}`,
+      isDemo ? initialTasks : []
+    );
+    const localTime = safeGetStorage<TimeEntry[]>(
+      `${STORAGE_KEYS.TIME_PREFIX}${currentUser.id}`,
+      isDemo ? initialTimeEntries : []
+    );
+    const localInvoices = safeGetStorage<Invoice[]>(
+      `${STORAGE_KEYS.INVOICES_PREFIX}${currentUser.id}`,
+      isDemo ? initialInvoices : []
+    );
+    const defaultWelcomeNotif: AppNotification[] = [
+      {
+        id: `notif-welcome-${currentUser.id}`,
+        userId: currentUser.id,
+        title: 'Welcome to Me Plus!',
+        message: `Hello ${currentUser.name}, your workspace is ready. Click "+ New Client" to start managing projects.`,
+        type: 'system',
+        priority: 'medium',
+        timestamp: 'Just now',
+        read: false,
+      },
+    ];
+    const localNotifs = safeGetStorage<AppNotification[]>(
+      `${STORAGE_KEYS.NOTIFS_PREFIX}${currentUser.id}`,
+      isDemo ? initialNotifications : defaultWelcomeNotif
+    );
+
+    setClients(localClients);
+    setProjects(localProjects);
+    setTasks(localTasks);
+    setTimeEntries(localTime);
+    setInvoices(localInvoices);
+    setNotifications(localNotifs);
+
+    // Sync from Backend REST API for this specific user
     Promise.all([
-      api.getClients().catch(() => null),
-      api.getProjects().catch(() => null),
-      api.getTasks().catch(() => null),
-      api.getTimeEntries().catch(() => null),
-      api.getInvoices().catch(() => null),
-      api.getNotifications().catch(() => null),
+      api.getClients(currentUser.id).catch(() => null),
+      api.getProjects(currentUser.id).catch(() => null),
+      api.getTasks(currentUser.id).catch(() => null),
+      api.getTimeEntries(currentUser.id).catch(() => null),
+      api.getInvoices(currentUser.id).catch(() => null),
+      api.getNotifications(currentUser.id).catch(() => null),
     ]).then(([apiClients, apiProjects, apiTasks, apiTime, apiInvoices, apiNotifs]) => {
-      if (apiClients && apiClients.length > 0) setClients(apiClients);
-      if (apiProjects && apiProjects.length > 0) setProjects(apiProjects);
-      if (apiTasks && apiTasks.length > 0) setTasks(apiTasks);
-      if (apiTime && apiTime.length > 0) setTimeEntries(apiTime);
-      if (apiInvoices && apiInvoices.length > 0) setInvoices(apiInvoices);
-      if (apiNotifs && apiNotifs.length > 0) setNotifications(apiNotifs);
+      if (apiClients !== null) setClients(apiClients);
+      if (apiProjects !== null) setProjects(apiProjects);
+      if (apiTasks !== null) setTasks(apiTasks);
+      if (apiTime !== null) setTimeEntries(apiTime);
+      if (apiInvoices !== null) setInvoices(apiInvoices);
+      if (apiNotifs !== null) {
+        if (apiNotifs.length > 0) setNotifications(apiNotifs);
+        else if (!isDemo) setNotifications(defaultWelcomeNotif);
+      }
     });
   }, []);
 
-  // Sync state changes to localStorage
+  // When user changes, load their isolated data
   useEffect(() => {
-    if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-    else localStorage.removeItem(STORAGE_KEYS.USER);
-  }, [user]);
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      loadUserData(user);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      loadUserData(null);
+    }
+  }, [user?.id]);
 
+  // Persist user collections to isolated local storage keys
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(registeredUsers));
   }, [registeredUsers]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
-  }, [clients]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(clients));
+    }
+  }, [clients, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
-  }, [projects]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`, JSON.stringify(projects));
+    }
+  }, [projects, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
-  }, [tasks]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(tasks));
+    }
+  }, [tasks, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TIME_ENTRIES, JSON.stringify(timeEntries));
-  }, [timeEntries]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`, JSON.stringify(timeEntries));
+    }
+  }, [timeEntries, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
-  }, [invoices]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`, JSON.stringify(invoices));
+    }
+  }, [invoices, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
-  }, [notifications]);
+    if (user) {
+      localStorage.setItem(`${STORAGE_KEYS.NOTIFS_PREFIX}${user.id}`, JSON.stringify(notifications));
+    }
+  }, [notifications, user?.id]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_TIMER, JSON.stringify(activeTimer));
@@ -421,7 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: true };
       }
     } catch (err: any) {
-      // If backend explicitly rejected (e.g. 401 unregistered or bad password), return that error directly!
+      // If backend explicitly rejected (e.g. 401), return that error directly!
       const errorMsg = err?.message || 'Invalid email or password.';
       return { success: false, error: errorMsg };
     }
@@ -509,7 +633,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]);
         showToast({
           title: 'Account Created!',
-          message: `Welcome to Me Plus, ${name}!`,
+          message: `Welcome to Me Plus, ${name}! Your fresh workspace is ready.`,
           type: 'success',
         });
         return { success: true };
@@ -549,7 +673,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(newUserProfile);
     showToast({
       title: 'Account Created!',
-      message: `Welcome to Me Plus, ${name}!`,
+      message: `Welcome to Me Plus, ${name}! Your fresh workspace is ready.`,
       type: 'success',
     });
     return { success: true };
@@ -568,11 +692,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: true, message: res.message };
       }
     } catch (err: any) {
-      // Backend reported user not found
       return { success: false, error: err?.message || 'No account found with this email address.' };
     }
 
-    // Check local directory
     const found = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
     if (!found) {
       return {
@@ -603,7 +725,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // continue with local update
     }
 
-    // Update local directory
     setRegisteredUsers(prev =>
       prev.map(u => (u.email.toLowerCase() === normalizedEmail ? { ...u, password: newPassword } : u))
     );
@@ -631,6 +752,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
+    resetTimer();
     setUser(null);
     showToast({
       title: 'Logged Out',
@@ -654,11 +776,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newClient: Client = {
       ...newClientData,
       id: `cli-${Date.now()}`,
+      userId: user?.id || 'usr-1',
       createdAt: new Date().toISOString().split('T')[0],
       totalBilled: 0,
     };
     setClients(prev => [newClient, ...prev]);
-    api.createClient(newClientData).catch(() => {});
+    api.createClient(newClient).catch(() => {});
     showToast({
       title: 'Client Added',
       message: `${newClient.name} (${newClient.company}) has been added.`,
@@ -723,12 +846,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newProject: Project = {
       ...projectData,
       id: `prj-${Date.now()}`,
+      userId: user?.id || 'usr-1',
       spent: 0,
       progress: 0,
       createdAt: new Date().toISOString().split('T')[0],
     };
     setProjects(prev => [newProject, ...prev]);
-    api.createProject(projectData).catch(() => {});
+    api.createProject(newProject).catch(() => {});
     showToast({
       title: 'Project Created',
       message: `Project "${newProject.title}" was launched.`,
@@ -801,13 +925,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newTask: Task = {
       ...taskData,
       id: `tsk-${Date.now()}`,
+      userId: user?.id || 'usr-1',
       actualHours: 0,
       createdAt: new Date().toISOString().split('T')[0],
     };
     const updatedTasks = [newTask, ...tasks];
     setTasks(updatedTasks);
     recalculateProjectProgress(newTask.projectId, updatedTasks);
-    api.createTask(taskData).catch(() => {});
+    api.createTask(newTask).catch(() => {});
 
     showToast({
       title: 'Task Created',
@@ -937,6 +1062,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const stopTimer = () => {
     if (activeTimer.elapsedSeconds > 0) {
       const newEntry: Omit<TimeEntry, 'id'> = {
+        userId: user?.id || 'usr-1',
         projectId: activeTimer.projectId,
         clientId: activeTimer.clientId,
         taskId: activeTimer.taskId || undefined,
@@ -945,7 +1071,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startTime: new Date(activeTimer.startTime || Date.now() - activeTimer.elapsedSeconds * 1000).toISOString(),
         endTime: new Date().toISOString(),
         isBillable: true,
-        hourlyRate: 65,
+        hourlyRate: user?.hourlyRate || 65,
         isBilled: false,
         date: new Date().toISOString().split('T')[0],
       };
@@ -974,9 +1100,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newEntry: TimeEntry = {
       ...entryData,
       id: `time-${Date.now()}`,
+      userId: user?.id || 'usr-1',
     };
     setTimeEntries(prev => [newEntry, ...prev]);
-    api.createTimeEntry(entryData).catch(() => {});
+    api.createTimeEntry(newEntry).catch(() => {});
 
     // Also update actual hours on task if specified
     if (newEntry.taskId) {
@@ -1018,10 +1145,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newInvoice: Invoice = {
       ...invoiceData,
       id: `inv-${Date.now()}`,
+      userId: user?.id || 'usr-1',
       createdAt: new Date().toISOString().split('T')[0],
     };
     setInvoices(prev => [newInvoice, ...prev]);
-    api.createInvoice(invoiceData).catch(() => {});
+    api.createInvoice(newInvoice).catch(() => {});
 
     // Update Client's total billed
     setClients(prev =>
@@ -1091,6 +1219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newNotif: AppNotification = {
       ...notif,
       id: `notif-${Date.now()}`,
+      userId: user?.id || 'usr-1',
       timestamp: new Date().toISOString(),
       read: false,
     };
@@ -1116,12 +1245,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.clear();
     setUser(null);
     setRegisteredUsers(defaultRegisteredUsers);
-    setClients(initialClients);
-    setProjects(initialProjects);
-    setTasks(initialTasks);
-    setTimeEntries(initialTimeEntries);
-    setInvoices(initialInvoices);
-    setNotifications(initialNotifications);
+    setClients([]);
+    setProjects([]);
+    setTasks([]);
+    setTimeEntries([]);
+    setInvoices([]);
+    setNotifications([]);
     resetTimer();
     api.resetData().catch(() => {});
     showToast({

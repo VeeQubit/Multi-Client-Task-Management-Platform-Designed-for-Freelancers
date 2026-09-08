@@ -30,6 +30,7 @@ export interface UserProfile {
 
 export interface Client {
   id: string;
+  userId?: string;
   name: string;
   company: string;
   email: string;
@@ -48,6 +49,7 @@ export interface Client {
 
 export interface Project {
   id: string;
+  userId?: string;
   clientId: string;
   title: string;
   description: string;
@@ -79,6 +81,7 @@ export interface TaskAttachment {
 
 export interface Task {
   id: string;
+  userId?: string;
   projectId: string;
   clientId: string;
   title: string;
@@ -97,6 +100,7 @@ export interface Task {
 
 export interface TimeEntry {
   id: string;
+  userId?: string;
   projectId: string;
   taskId?: string;
   clientId: string;
@@ -120,6 +124,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id: string;
+  userId?: string;
   invoiceNumber: string;
   clientId: string;
   projectId?: string;
@@ -142,6 +147,7 @@ export interface Invoice {
 
 export interface AppNotification {
   id: string;
+  userId?: string;
   title: string;
   message: string;
   type: 'deadline' | 'project' | 'invoice' | 'system' | 'reminder' | 'client';

@@ -185,6 +185,51 @@ async function runAuthTestSuite() {
     if (res.status !== 401) throw new Error(`Expected HTTP 401, got ${res.status}`);
   });
 
+  // --- Test 11: Demo Account Data Access ---
+  await test('Verify Demo Account has pre-populated clients and projects', async () => {
+    const resClients = await fetch(`${BASE}/clients?userId=usr-1`);
+    const clients = await resClients.json();
+    if (!Array.isArray(clients) || clients.length === 0) {
+      throw new Error('Demo account should have pre-populated clients');
+    }
+  });
+
+  // --- Test 12: New User Data Isolation (Clean Workspace) ---
+  await test('Verify newly registered user starts with 0 clients (Clean Slate)', async () => {
+    const newUserId = `usr-isolated-${Date.now()}`;
+    const resClients = await fetch(`${BASE}/clients?userId=${newUserId}`);
+    const clients = await resClients.json();
+    if (!Array.isArray(clients) || clients.length !== 0) {
+      throw new Error(`New user should start with 0 clients, got ${clients.length}`);
+    }
+  });
+
+  // --- Test 13: Adding data to New User does not pollute other accounts ---
+  await test('Verify newly created client is isolated to specific userId', async () => {
+    const newUserId = `usr-isolated-${Date.now()}`;
+    const newClientRes = await fetch(`${BASE}/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: newUserId,
+        name: 'Private Client Inc',
+        company: 'Private Client Inc',
+        email: 'private@client.com',
+        color: '#128C7E',
+        status: 'active',
+        hourlyRate: 85,
+        currency: '$',
+      }),
+    });
+    if (newClientRes.status !== 201) throw new Error('Failed to create isolated client');
+
+    const resUserClients = await fetch(`${BASE}/clients?userId=${newUserId}`);
+    const userClients = await resUserClients.json();
+    if (userClients.length !== 1 || userClients[0].name !== 'Private Client Inc') {
+      throw new Error('User should have exactly 1 private client');
+    }
+  });
+
   console.log(`\n${colors.bold}------------------------------------------------------${colors.reset}`);
   console.log(`  ${colors.bold}SUMMARY:${colors.reset} Total: ${passed + failed} | Passed: ${colors.green}${passed}${colors.reset} | Failed: ${colors.red}${failed}${colors.reset}`);
   console.log(`${colors.bold}------------------------------------------------------${colors.reset}\n`);

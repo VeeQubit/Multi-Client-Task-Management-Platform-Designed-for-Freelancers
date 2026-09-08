@@ -23,6 +23,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Helper to get active userId from request
+function getReqUserId(req) {
+  return req.query.userId || req.headers['x-user-id'] || req.body?.userId;
+}
+
 // --- Health Check ---
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -88,8 +93,9 @@ app.post('/api/auth/register', (req, res) => {
     });
   }
 
+  const newUserId = `usr-${Date.now()}`;
   const newUser = {
-    id: `usr-${Date.now()}`,
+    id: newUserId,
     name: name.trim(),
     email: normalizedEmail,
     password,
@@ -109,6 +115,21 @@ app.post('/api/auth/register', (req, res) => {
 
   users.push(newUser);
   db.users = users;
+
+  // Add a welcoming notification for this new user in their fresh workspace
+  const notifications = db.notifications || [];
+  notifications.unshift({
+    id: `notif-${Date.now()}`,
+    userId: newUserId,
+    title: 'Welcome to Me Plus!',
+    message: `Hello ${newUser.name}, your workspace is ready. Click "+ New Client" to start managing projects.`,
+    type: 'system',
+    priority: 'medium',
+    timestamp: 'Just now',
+    read: false,
+  });
+  db.notifications = notifications;
+
   const { password: _, ...safeUser } = newUser;
   db.user = safeUser;
   writeDb(db);
@@ -190,16 +211,19 @@ app.put('/api/auth/profile', (req, res) => {
 
 // --- Clients Endpoints ---
 app.get('/api/clients', (req, res) => {
-  const clients = getCollection('clients');
+  const userId = getReqUserId(req);
+  const clients = getCollection('clients', userId);
   res.json(clients);
 });
 
 app.post('/api/clients', (req, res) => {
   const newClientData = req.body;
+  const userId = getReqUserId(req) || 'usr-1';
   const clients = getCollection('clients');
   const newClient = {
     ...newClientData,
     id: `cli-${Date.now()}`,
+    userId: newClientData.userId || userId,
     totalBilled: 0,
     createdAt: new Date().toISOString().split('T')[0],
   };
@@ -230,16 +254,19 @@ app.delete('/api/clients/:id', (req, res) => {
 
 // --- Projects Endpoints ---
 app.get('/api/projects', (req, res) => {
-  const projects = getCollection('projects');
+  const userId = getReqUserId(req);
+  const projects = getCollection('projects', userId);
   res.json(projects);
 });
 
 app.post('/api/projects', (req, res) => {
   const newProjectData = req.body;
+  const userId = getReqUserId(req) || 'usr-1';
   const projects = getCollection('projects');
   const newProject = {
     ...newProjectData,
     id: `prj-${Date.now()}`,
+    userId: newProjectData.userId || userId,
     spent: 0,
     progress: 0,
     createdAt: new Date().toISOString().split('T')[0],
@@ -271,16 +298,19 @@ app.delete('/api/projects/:id', (req, res) => {
 
 // --- Tasks Endpoints ---
 app.get('/api/tasks', (req, res) => {
-  const tasks = getCollection('tasks');
+  const userId = getReqUserId(req);
+  const tasks = getCollection('tasks', userId);
   res.json(tasks);
 });
 
 app.post('/api/tasks', (req, res) => {
   const newTaskData = req.body;
+  const userId = getReqUserId(req) || 'usr-1';
   const tasks = getCollection('tasks');
   const newTask = {
     ...newTaskData,
     id: `tsk-${Date.now()}`,
+    userId: newTaskData.userId || userId,
     actualHours: 0,
     subtasks: newTaskData.subtasks || [],
     attachments: newTaskData.attachments || [],
@@ -313,16 +343,19 @@ app.delete('/api/tasks/:id', (req, res) => {
 
 // --- Time Entries Endpoints ---
 app.get('/api/time-entries', (req, res) => {
-  const timeEntries = getCollection('timeEntries');
+  const userId = getReqUserId(req);
+  const timeEntries = getCollection('timeEntries', userId);
   res.json(timeEntries);
 });
 
 app.post('/api/time-entries', (req, res) => {
   const newEntryData = req.body;
+  const userId = getReqUserId(req) || 'usr-1';
   const timeEntries = getCollection('timeEntries');
   const newEntry = {
     ...newEntryData,
     id: `time-${Date.now()}`,
+    userId: newEntryData.userId || userId,
     date: newEntryData.date || new Date().toISOString().split('T')[0],
   };
   timeEntries.unshift(newEntry);
@@ -340,16 +373,19 @@ app.delete('/api/time-entries/:id', (req, res) => {
 
 // --- Invoices Endpoints ---
 app.get('/api/invoices', (req, res) => {
-  const invoices = getCollection('invoices');
+  const userId = getReqUserId(req);
+  const invoices = getCollection('invoices', userId);
   res.json(invoices);
 });
 
 app.post('/api/invoices', (req, res) => {
   const newInvoiceData = req.body;
+  const userId = getReqUserId(req) || 'usr-1';
   const invoices = getCollection('invoices');
   const newInvoice = {
     ...newInvoiceData,
     id: `inv-${Date.now()}`,
+    userId: newInvoiceData.userId || userId,
     createdAt: new Date().toISOString().split('T')[0],
   };
   invoices.unshift(newInvoice);
@@ -379,7 +415,8 @@ app.delete('/api/invoices/:id', (req, res) => {
 
 // --- Notifications Endpoints ---
 app.get('/api/notifications', (req, res) => {
-  const notifs = getCollection('notifications');
+  const userId = getReqUserId(req);
+  const notifs = getCollection('notifications', userId);
   res.json(notifs);
 });
 
@@ -393,7 +430,14 @@ app.put('/api/notifications/:id/read', (req, res) => {
 });
 
 app.delete('/api/notifications', (req, res) => {
-  saveCollection('notifications', []);
+  const userId = getReqUserId(req);
+  let notifs = getCollection('notifications');
+  if (userId) {
+    notifs = notifs.filter(n => n.userId !== userId);
+  } else {
+    notifs = [];
+  }
+  saveCollection('notifications', notifs);
   res.json({ success: true });
 });
 
@@ -411,11 +455,11 @@ app.post('/api/ai/chat', (req, res) => {
   } else if (query.includes('scope') || query.includes('extra') || query.includes('change')) {
     reply = "🛡️ **Handling Scope Creep**:\n• Acknowledge the request positively: *'I love this idea and it will definitely improve the project!'*\n• Present clear timeline & budget addendum: *'Since this is beyond our initial milestone scope, this addition will require approx 5 hours ($350) and 2 days extension.'*";
   } else if (query.includes('summary') || query.includes('status') || query.includes('overview') || query.includes('work')) {
-    const db = readDb();
-    const projects = db.projects || [];
-    const tasks = db.tasks || [];
+    const userId = getReqUserId(req);
+    const projects = getCollection('projects', userId);
+    const tasks = getCollection('tasks', userId);
     const pending = tasks.filter(t => t.status !== 'done').length;
-    reply = `📊 **Workspace Status Summary**:\n• You currently have **${projects.length} active projects**.\n• **${pending} tasks** are in your pipeline.\n• Your delivery velocity is healthy! Focus on urgent milestone deadlines first.`;
+    reply = `📊 **Workspace Status Summary**:\n• You currently have **${projects.length} active projects**.\n• **${pending} tasks** are in your pipeline.\n• Keep up the momentum! Organize your client milestones and prioritize urgent tasks.`;
   } else {
     reply = `🤖 **Me Plus AI Advisor**:\nI am here to help you manage clients, draft professional communications, negotiate milestone changes, and organize tasks. How can I assist you with your project today?`;
   }
@@ -433,4 +477,3 @@ app.post('/api/reset', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Me Plus Backend REST API running at http://localhost:${PORT}`);
 });
-
