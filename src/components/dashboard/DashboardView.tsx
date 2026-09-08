@@ -78,7 +78,7 @@ export const DashboardView: React.FC = () => {
             </div>
 
             <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-              {getGreeting()}, {user?.name.split(' ')[0] || 'Freelancer'}! 🚀
+              {getGreeting()}, {user?.name ? user.name.split(' ')[0] : 'Freelancer'}! 🚀
             </h1>
             <p className="text-xs md:text-sm text-emerald-100/90 mt-1 max-w-xl leading-relaxed">
               Your client projects, pending task deadlines, and billable hours are unified in one centralized workspace.

@@ -150,6 +150,17 @@ const STORAGE_KEYS = {
   ACTIVE_TIMER: 'meplus_active_timer_v1',
 };
 
+function safeGetStorage<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    return JSON.parse(saved);
+  } catch (e) {
+    console.warn(`Error parsing localStorage for ${key}`, e);
+    return fallback;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -157,55 +168,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User & Auth State
   const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USER);
-    return saved ? JSON.parse(saved) : null;
+    return safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
   });
 
   // Data Collections
   const [clients, setClients] = useState<Client[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-    return saved ? JSON.parse(saved) : initialClients;
+    return safeGetStorage<Client[]>(STORAGE_KEYS.CLIENTS, initialClients);
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-    return saved ? JSON.parse(saved) : initialProjects;
+    return safeGetStorage<Project[]>(STORAGE_KEYS.PROJECTS, initialProjects);
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
-    return saved ? JSON.parse(saved) : initialTasks;
+    return safeGetStorage<Task[]>(STORAGE_KEYS.TASKS, initialTasks);
   });
 
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TIME_ENTRIES);
-    return saved ? JSON.parse(saved) : initialTimeEntries;
+    return safeGetStorage<TimeEntry[]>(STORAGE_KEYS.TIME_ENTRIES, initialTimeEntries);
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.INVOICES);
-    return saved ? JSON.parse(saved) : initialInvoices;
+    return safeGetStorage<Invoice[]>(STORAGE_KEYS.INVOICES, initialInvoices);
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-    return saved ? JSON.parse(saved) : initialNotifications;
+    return safeGetStorage<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
   });
 
   // Active Stopwatch Timer
   const [activeTimer, setActiveTimer] = useState<ActiveTimer>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_TIMER);
-    return saved
-      ? JSON.parse(saved)
-      : {
-          isRunning: false,
-          projectId: '',
-          taskId: '',
-          clientId: '',
-          description: '',
-          startTime: 0,
-          elapsedSeconds: 0,
-        };
+    return safeGetStorage<ActiveTimer>(STORAGE_KEYS.ACTIVE_TIMER, {
+      isRunning: false,
+      projectId: '',
+      taskId: '',
+      clientId: '',
+      description: '',
+      startTime: 0,
+      elapsedSeconds: 0,
+    });
   });
 
   // Toasts

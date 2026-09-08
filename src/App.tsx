@@ -8,6 +8,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import { AiAssistantModal } from './components/ai/AiAssistantModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { AuthPage } from './components/auth/AuthPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 import { DashboardView } from './components/dashboard/DashboardView';
 import { ClientListView } from './components/clients/ClientListView';
@@ -89,11 +90,13 @@ const MainContent: React.FC = () => {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <AppProvider>
-        <MainContent />
-      </AppProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AppProvider>
+          <MainContent />
+        </AppProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
