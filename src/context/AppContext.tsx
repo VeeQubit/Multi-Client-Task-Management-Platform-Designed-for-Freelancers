@@ -44,6 +44,8 @@ interface AppContextType {
   // Auth & User
   user: UserProfile | null;
   isAuthenticated: boolean;
+  login: (email: string) => boolean;
+  register: (name: string, email: string, title?: string) => boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, profession?: string) => Promise<{ success: boolean; error?: string }>;
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
@@ -399,6 +401,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [registeredUsers]);
 
   // User Actions
+  const login = (email: string) => {
+    const loggedUser = {
+      ...initialUser,
+      email,
+      name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
   const login = async (email: string, password?: string) => {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -448,16 +455,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notificationSettings: initialUser.notificationSettings,
       theme: 'light',
     };
+    setUser(loggedUser);
+    api.login(email).catch(() => {});
 
     setUser(authenticatedUser);
     showToast({
       title: 'Welcome back!',
+      message: `Signed in as ${email}`,
       message: `Signed in as ${authenticatedUser.name}`,
       type: 'success',
     });
+    return true;
     return { success: true };
   };
 
+  const register = (name: string, email: string, title?: string) => {
+    const newUserObj = {
+      ...initialUser,
+      name,
+      email,
+      title: title || 'Independent Professional & Freelancer',
   const register = async (name: string, email: string, password: string, profession?: string) => {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -506,6 +523,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       title: profession || 'Independent Freelancer',
       avatar: initialUser.avatar,
     };
+    setUser(newUserObj);
+    api.register(name, email, title).catch(() => {});
 
     setRegisteredUsers(prev => [...prev, newUserAccount]);
 
@@ -529,6 +548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: `Welcome to Me Plus, ${name}!`,
       type: 'success',
     });
+    return true;
     return { success: true };
   };
 
@@ -592,6 +612,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginDemoUser = () => {
     setUser(initialUser);
+    api.login(initialUser.email).catch(() => {});
     api.login(initialUser.email, 'password123').catch(() => {});
     showToast({
       title: 'Demo Mode Activated',
@@ -1222,8 +1243,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated: !!user,
         login,
         register,
-        forgotPassword,
-        resetPassword,
         loginDemoUser,
         logout,
         updateUserProfile,

@@ -8,6 +8,7 @@
     "client": "vite",
     "server": "node server/src/server.js",
     "build": "tsc -b && vite build",
+    "test": "node server/test-auth.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
