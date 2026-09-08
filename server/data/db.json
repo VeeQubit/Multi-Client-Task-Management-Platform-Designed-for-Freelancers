@@ -71,12 +71,66 @@
         "sound": true,
         "deadlineReminderHours": 24
       }
+    },
+    {
+      "id": "usr-1788853369465",
+      "name": "renu",
+      "email": "renuan@gmail.com",
+      "password": "123456",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
+      "title": "Graphic Designer & Illustrator",
+      "hourlyRate": 65,
+      "currency": "$",
+      "bio": "Freelancer specializing in Graphic Designer & Illustrator.",
+      "notificationSettings": {
+        "email": true,
+        "sms": true,
+        "browser": true,
+        "sound": true,
+        "deadlineReminderHours": 24
+      }
+    },
+    {
+      "id": "usr-1788853717399",
+      "name": "Jordan Lee",
+      "email": "freelancer_1788853717395@example.com",
+      "password": "BrandNewUpdatedPassword2026!",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
+      "title": "3D Motion & VFX Designer",
+      "hourlyRate": 65,
+      "currency": "$",
+      "bio": "Freelancer specializing in 3D Motion & VFX Designer.",
+      "notificationSettings": {
+        "email": true,
+        "sms": true,
+        "browser": true,
+        "sound": true,
+        "deadlineReminderHours": 24
+      }
+    },
+    {
+      "id": "usr-1788853731236",
+      "name": "Jordan Lee",
+      "email": "freelancer_1788853731234@example.com",
+      "password": "BrandNewUpdatedPassword2026!",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
+      "title": "3D Motion & VFX Designer",
+      "hourlyRate": 65,
+      "currency": "$",
+      "bio": "Freelancer specializing in 3D Motion & VFX Designer.",
+      "notificationSettings": {
+        "email": true,
+        "sms": true,
+        "browser": true,
+        "sound": true,
+        "deadlineReminderHours": 24
+      }
     }
   ],
   "user": {
-    "id": "usr-1788853123552",
+    "id": "usr-1788853731236",
     "name": "Jordan Lee",
-    "email": "freelancer_1788853123550@example.com",
+    "email": "freelancer_1788853731234@example.com",
     "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256",
     "title": "3D Motion & VFX Designer",
     "hourlyRate": 65,
@@ -91,6 +145,32 @@
     }
   },
   "clients": [
+    {
+      "userId": "usr-isolated-1788853731266",
+      "name": "Private Client Inc",
+      "company": "Private Client Inc",
+      "email": "private@client.com",
+      "color": "#128C7E",
+      "status": "active",
+      "hourlyRate": 85,
+      "currency": "$",
+      "id": "cli-1788853731268",
+      "totalBilled": 0,
+      "createdAt": "2026-09-08"
+    },
+    {
+      "userId": "usr-isolated-1788853717431",
+      "name": "Private Client Inc",
+      "company": "Private Client Inc",
+      "email": "private@client.com",
+      "color": "#128C7E",
+      "status": "active",
+      "hourlyRate": 85,
+      "currency": "$",
+      "id": "cli-1788853717433",
+      "totalBilled": 0,
+      "createdAt": "2026-09-08"
+    },
     {
       "userId": "usr-isolated-1788853123593",
       "name": "Private Client Inc",
@@ -466,6 +546,36 @@
     }
   ],
   "notifications": [
+    {
+      "id": "notif-1788853731237",
+      "userId": "usr-1788853731236",
+      "title": "Welcome to Me Plus!",
+      "message": "Hello Jordan Lee, your workspace is ready. Click \"+ New Client\" to start managing projects.",
+      "type": "system",
+      "priority": "medium",
+      "timestamp": "Just now",
+      "read": false
+    },
+    {
+      "id": "notif-1788853717399",
+      "userId": "usr-1788853717399",
+      "title": "Welcome to Me Plus!",
+      "message": "Hello Jordan Lee, your workspace is ready. Click \"+ New Client\" to start managing projects.",
+      "type": "system",
+      "priority": "medium",
+      "timestamp": "Just now",
+      "read": false
+    },
+    {
+      "id": "notif-1788853369465",
+      "userId": "usr-1788853369465",
+      "title": "Welcome to Me Plus!",
+      "message": "Hello renu, your workspace is ready. Click \"+ New Client\" to start managing projects.",
+      "type": "system",
+      "priority": "medium",
+      "timestamp": "Just now",
+      "read": false
+    },
     {
       "id": "notif-1788853123552",
       "userId": "usr-1788853123552",

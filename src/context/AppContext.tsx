@@ -521,7 +521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
-  // User Actions - Strict Authentication
+  // User Actions - Strict Authentication with Bidirectional Persistence Sync
   const login = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     const normalizedEmail = (email || '').trim().toLowerCase();
 
@@ -532,11 +532,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Please enter your password.' };
     }
 
-    // Try backend REST API first
+    // 1. Try backend REST API first
     try {
       const res = await api.login(normalizedEmail, password);
       if (res && res.user) {
         setUser(res.user);
+        // Ensure user is synced in registeredUsers local directory as well
+        setRegisteredUsers(prev => {
+          if (!prev.some(u => u.email.toLowerCase() === normalizedEmail)) {
+            return [
+              ...prev,
+              {
+                id: res.user.id,
+                name: res.user.name,
+                email: normalizedEmail,
+                password,
+                title: res.user.title,
+              },
+            ];
+          }
+          return prev;
+        });
         showToast({
           title: 'Welcome back!',
           message: `Signed in as ${res.user.name || res.user.email}`,
@@ -545,12 +561,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: true };
       }
     } catch (err: any) {
-      // If backend explicitly rejected (e.g. 401), return that error directly!
-      const errorMsg = err?.message || 'Invalid email or password.';
-      return { success: false, error: errorMsg };
+      // If backend explicitly rejected due to wrong password for an account it has, return that error
+      if (err?.message?.includes('password you entered is incorrect')) {
+        return { success: false, error: err.message };
+      }
+      // If backend returned "no account registered" or network error, fall through to check local storage directory
     }
 
-    // Fallback: Check local registered users directory
+    // 2. Check local registered users directory (ensures persistence across browser sessions & Vercel deployment)
     const matched = registeredUsers.find(u => u.email.toLowerCase() === normalizedEmail);
     if (!matched) {
       return {
@@ -565,6 +583,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         error: 'Invalid credentials: The password you entered is incorrect. Please check and try again.',
       };
     }
+
+    // Seamless auto-sync to backend in background if backend was missing this user
+    api.register(matched.name, matched.email, password, matched.title).catch(() => {});
 
     const authenticatedUser: UserProfile = {
       id: matched.id,
@@ -607,16 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Password must be at least 6 characters long.' };
     }
 
-    // Check duplicate in local directory
-    const existsLocally = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
-    if (existsLocally) {
-      return {
-        success: false,
-        error: 'An account with this email address already exists. Please sign in instead.',
-      };
-    }
-
-    // Try backend REST API
+    // 1. Try backend REST API
     try {
       const res = await api.register(name.trim(), normalizedEmail, password, profession);
       if (res && res.user) {
@@ -644,7 +656,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Local client registration fallback
+    // Check duplicate in local directory if backend was offline
+    const existsLocally = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
+    if (existsLocally) {
+      return {
+        success: false,
+        error: 'An account with this email address already exists. Please sign in instead.',
+      };
+    }
+
+    // Local client registration fallback (e.g. for static/Vercel environments)
     const newUserAccount: RegisteredAccount = {
       id: `usr-${Date.now()}`,
       name: name.trim(),
