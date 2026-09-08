@@ -44,8 +44,6 @@ interface AppContextType {
   // Auth & User
   user: UserProfile | null;
   isAuthenticated: boolean;
-  login: (email: string) => boolean;
-  register: (name: string, email: string, title?: string) => boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, profession?: string) => Promise<{ success: boolean; error?: string }>;
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
@@ -208,12 +206,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Registered Users Directory (for client-side auth verification)
+  // Registered Users Directory (for client-side auth verification fallback)
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredAccount[]>(() => {
     return safeGetStorage<RegisteredAccount[]>(STORAGE_KEYS.USERS, defaultRegisteredUsers);
   });
 
-  // User & Auth State
+  // User & Auth State - default to null (no user logged in initially)
   const [user, setUser] = useState<UserProfile | null>(() => {
     return safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
   });
@@ -296,6 +294,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_KEYS.USER);
   }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(registeredUsers));
+  }, [registeredUsers]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
@@ -395,20 +397,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
-  // Sync registered users to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(registeredUsers));
-  }, [registeredUsers]);
+  // User Actions - Strict Authentication
+  const login = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-  // User Actions
-  const login = (email: string) => {
-    const loggedUser = {
-      ...initialUser,
-      email,
-      name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-  const login = async (email: string, password?: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!password) {
+      return { success: false, error: 'Please enter your password.' };
+    }
 
+    // Try backend REST API first
     try {
       const res = await api.login(normalizedEmail, password);
       if (res && res.user) {
@@ -421,12 +421,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: true };
       }
     } catch (err: any) {
-      // If backend explicitly rejected invalid user or wrong password, return error directly!
+      // If backend explicitly rejected (e.g. 401 unregistered or bad password), return that error directly!
       const errorMsg = err?.message || 'Invalid email or password.';
       return { success: false, error: errorMsg };
     }
 
-    // Client-side fallback directory check
+    // Fallback: Check local registered users directory
     const matched = registeredUsers.find(u => u.email.toLowerCase() === normalizedEmail);
     if (!matched) {
       return {
@@ -435,7 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    if (password && matched.password && matched.password !== password) {
+    if (matched.password && matched.password !== password) {
       return {
         success: false,
         error: 'Invalid credentials: The password you entered is incorrect. Please check and try again.',
@@ -455,40 +455,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notificationSettings: initialUser.notificationSettings,
       theme: 'light',
     };
-    setUser(loggedUser);
-    api.login(email).catch(() => {});
 
     setUser(authenticatedUser);
     showToast({
       title: 'Welcome back!',
-      message: `Signed in as ${email}`,
       message: `Signed in as ${authenticatedUser.name}`,
       type: 'success',
     });
-    return true;
     return { success: true };
   };
 
-  const register = (name: string, email: string, title?: string) => {
-    const newUserObj = {
-      ...initialUser,
-      name,
-      email,
-      title: title || 'Independent Professional & Freelancer',
-  const register = async (name: string, email: string, password: string, profession?: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    profession?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    // Check duplicate
-    const exists = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
-    if (exists) {
+    if (!name || !name.trim()) {
+      return { success: false, error: 'Please enter your full name.' };
+    }
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long.' };
+    }
+
+    // Check duplicate in local directory
+    const existsLocally = registeredUsers.some(u => u.email.toLowerCase() === normalizedEmail);
+    if (existsLocally) {
       return {
         success: false,
         error: 'An account with this email address already exists. Please sign in instead.',
       };
     }
 
+    // Try backend REST API
     try {
-      const res = await api.register(name, normalizedEmail, password, profession);
+      const res = await api.register(name.trim(), normalizedEmail, password, profession);
       if (res && res.user) {
         setUser(res.user);
         setRegisteredUsers(prev => [
@@ -514,7 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Local client registration
+    // Local client registration fallback
     const newUserAccount: RegisteredAccount = {
       id: `usr-${Date.now()}`,
       name: name.trim(),
@@ -523,8 +529,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       title: profession || 'Independent Freelancer',
       avatar: initialUser.avatar,
     };
-    setUser(newUserObj);
-    api.register(name, email, title).catch(() => {});
 
     setRegisteredUsers(prev => [...prev, newUserAccount]);
 
@@ -548,12 +552,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: `Welcome to Me Plus, ${name}!`,
       type: 'success',
     });
-    return true;
     return { success: true };
   };
 
-  const forgotPassword = async (email: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
+  const forgotPassword = async (email: string): Promise<{ success: boolean; error?: string; message?: string }> => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
 
     try {
       const res = await api.forgotPassword(normalizedEmail);
@@ -580,10 +587,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const resetPassword = async (email: string, newPassword: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
+  const resetPassword = async (
+    email: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string; message?: string }> => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    if (newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 6) {
       return { success: false, error: 'Password must be at least 6 characters long.' };
     }
 
@@ -612,7 +622,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginDemoUser = () => {
     setUser(initialUser);
-    api.login(initialUser.email).catch(() => {});
     api.login(initialUser.email, 'password123').catch(() => {});
     showToast({
       title: 'Demo Mode Activated',
@@ -835,76 +844,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTasks(nextTasks);
     recalculateProjectProgress(taskToDelete.projectId, nextTasks);
     api.deleteTask(id).catch(() => {});
-
     showToast({
-      title: 'Task Removed',
-      message: `"${taskToDelete.title}" deleted.`,
+      title: 'Task Deleted',
+      message: `"${taskToDelete.title}" removed.`,
       type: 'warning',
       undoAction: () => {
         setTasks(prev => [taskToDelete, ...prev]);
-        recalculateProjectProgress(taskToDelete.projectId, [...nextTasks, taskToDelete]);
         api.createTask(taskToDelete).catch(() => {});
       },
-      undoLabel: 'Undo Delete',
+      undoLabel: 'Restore',
     });
   };
 
   const moveTaskStatus = (id: string, newStatus: TaskStatus) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    const oldStatus = task.status;
-    if (oldStatus === newStatus) return;
+    setTasks(prev => {
+      const targetTask = prev.find(t => t.id === id);
+      if (!targetTask) return prev;
 
-    if (newStatus === 'done') {
-      // Trigger informative feedback (celebration confetti!)
-      confetti({
-        particleCount: 75,
-        spread: 70,
-        origin: { y: 0.7 },
-        colors: ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ec4899'],
-      });
-    }
+      const wasNotDone = targetTask.status !== 'done';
+      const isNowDone = newStatus === 'done';
 
-    const completedAt = newStatus === 'done' ? new Date().toISOString().split('T')[0] : undefined;
-    const updatedTasks = tasks.map(t =>
-      t.id === id
-        ? {
-            ...t,
-            status: newStatus,
-            completedAt,
-          }
-        : t
-    );
-    setTasks(updatedTasks);
-    recalculateProjectProgress(task.projectId, updatedTasks);
-    api.updateTask(id, { status: newStatus, completedAt }).catch(() => {});
+      const next = prev.map(t => (t.id === id ? { ...t, status: newStatus } : t));
+      recalculateProjectProgress(targetTask.projectId, next);
 
-    showToast({
-      title: `Task Moved to ${newStatus.replace('-', ' ').toUpperCase()}`,
-      message: `"${task.title}" updated.`,
-      type: newStatus === 'done' ? 'success' : 'info',
-      undoAction: () => {
-        const revertedTasks = tasks.map(t => (t.id === id ? { ...t, status: oldStatus } : t));
-        setTasks(revertedTasks);
-        recalculateProjectProgress(task.projectId, revertedTasks);
-        api.updateTask(id, { status: oldStatus }).catch(() => {});
-      },
-      undoLabel: 'Undo Move',
+      // Trigger Confetti Celebration on task completion!
+      if (wasNotDone && isNowDone) {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#128C7E', '#25D366', '#34B7F1', '#ECE5DD', '#10B981'],
+        });
+      }
+
+      return next;
     });
+    api.updateTask(id, { status: newStatus }).catch(() => {});
   };
 
   const toggleSubtask = (taskId: string, subtaskId: string) => {
-    setTasks(prev =>
-      prev.map(t => {
-        if (t.id === taskId) {
-          const nextSubtasks = t.subtasks.map(st =>
+    setTasks(prev => {
+      const next = prev.map(t => {
+        if (t.id === taskId && t.subtasks) {
+          const updatedSubtasks = t.subtasks.map(st =>
             st.id === subtaskId ? { ...st, completed: !st.completed } : st
           );
-          return { ...t, subtasks: nextSubtasks };
+          return { ...t, subtasks: updatedSubtasks };
         }
         return t;
-      })
-    );
+      });
+      const target = next.find(t => t.id === taskId);
+      if (target) {
+        api.updateTask(taskId, { subtasks: target.subtasks }).catch(() => {});
+      }
+      return next;
+    });
   };
 
   const getTaskById = (id: string) => tasks.find(t => t.id === id);
@@ -916,80 +910,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       projectId,
       clientId,
       taskId: taskId || '',
-      description: description || 'Working on client deliverables',
+      description: description || '',
       startTime: Date.now(),
       elapsedSeconds: 0,
     });
     showToast({
       title: 'Timer Started',
-      message: 'Tracking billable project time live in the navbar.',
+      message: 'Time tracking is now live.',
       type: 'info',
     });
   };
 
   const pauseTimer = () => {
     setActiveTimer(prev => ({ ...prev, isRunning: false }));
+    showToast({
+      title: 'Timer Paused',
+      message: 'Tracking paused. You can resume anytime.',
+      type: 'info',
+    });
   };
 
   const resumeTimer = () => {
     setActiveTimer(prev => ({ ...prev, isRunning: true }));
   };
 
-  const updateTimerDescription = (desc: string) => {
-    setActiveTimer(prev => ({ ...prev, description: desc }));
-  };
-
   const stopTimer = () => {
-    if (activeTimer.elapsedSeconds < 10) {
-      // Ignore very short timer accidental clicks
-      resetTimer();
-      return;
+    if (activeTimer.elapsedSeconds > 0) {
+      const newEntry: Omit<TimeEntry, 'id'> = {
+        projectId: activeTimer.projectId,
+        clientId: activeTimer.clientId,
+        taskId: activeTimer.taskId || undefined,
+        description: activeTimer.description || 'Tracked Freelance Session',
+        durationSeconds: activeTimer.elapsedSeconds,
+        startTime: new Date(activeTimer.startTime || Date.now() - activeTimer.elapsedSeconds * 1000).toISOString(),
+        endTime: new Date().toISOString(),
+        isBillable: true,
+        hourlyRate: 65,
+        isBilled: false,
+        date: new Date().toISOString().split('T')[0],
+      };
+      addTimeEntry(newEntry);
     }
-
-    const client = clients.find(c => c.id === activeTimer.clientId);
-    const hourlyRate = client?.hourlyRate || user?.hourlyRate || 65;
-
-    const newEntry: TimeEntry = {
-      id: `time-${Date.now()}`,
-      projectId: activeTimer.projectId,
-      taskId: activeTimer.taskId || undefined,
-      clientId: activeTimer.clientId,
-      description: activeTimer.description || 'General Freelance Task',
-      durationSeconds: activeTimer.elapsedSeconds,
-      startTime: new Date(Date.now() - activeTimer.elapsedSeconds * 1000).toISOString(),
-      endTime: new Date().toISOString(),
-      isBillable: true,
-      hourlyRate,
-      isBilled: false,
-      date: new Date().toISOString().split('T')[0],
-    };
-
-    setTimeEntries(prev => [newEntry, ...prev]);
-
-    // Update project spent
-    const earned = Math.round((activeTimer.elapsedSeconds / 3600) * hourlyRate);
-    setProjects(prev =>
-      prev.map(p => (p.id === activeTimer.projectId ? { ...p, spent: p.spent + earned } : p))
-    );
-
-    // Update task actual hours if attached
-    if (activeTimer.taskId) {
-      const addedHours = Number((activeTimer.elapsedSeconds / 3600).toFixed(2));
-      setTasks(prev =>
-        prev.map(t =>
-          t.id === activeTimer.taskId ? { ...t, actualHours: t.actualHours + addedHours } : t
-        )
-      );
-    }
-
     resetTimer();
-    api.createTimeEntry(newEntry).catch(() => {});
-
-    showToast({
-      title: 'Time Logged Successfully',
-      message: `${Math.round(newEntry.durationSeconds / 60)} minutes logged to client (${client?.company || 'Client'}).`,
-      type: 'success',
-    });
   };
 
   const resetTimer = () => {
@@ -1004,6 +966,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const updateTimerDescription = (description: string) => {
+    setActiveTimer(prev => ({ ...prev, description }));
+  };
+
   const addTimeEntry = (entryData: Omit<TimeEntry, 'id'>) => {
     const newEntry: TimeEntry = {
       ...entryData,
@@ -1012,27 +978,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeEntries(prev => [newEntry, ...prev]);
     api.createTimeEntry(entryData).catch(() => {});
 
-    // Update project budget spent
-    const earned = Math.round((newEntry.durationSeconds / 3600) * newEntry.hourlyRate);
-    setProjects(prev =>
-      prev.map(p => (p.id === newEntry.projectId ? { ...p, spent: p.spent + earned } : p))
-    );
+    // Also update actual hours on task if specified
+    if (newEntry.taskId) {
+      const addedHours = Number((newEntry.durationSeconds / 3600).toFixed(2));
+      setTasks(prev =>
+        prev.map(t =>
+          t.id === newEntry.taskId
+            ? { ...t, actualHours: Number(((t.actualHours || 0) + addedHours).toFixed(2)) }
+            : t
+        )
+      );
+    }
 
+    const hrsDisplay = (newEntry.durationSeconds / 3600).toFixed(1);
     showToast({
-      title: 'Manual Time Log Saved',
-      message: `${(newEntry.durationSeconds / 3600).toFixed(1)} hrs added to time logs.`,
+      title: 'Time Logged',
+      message: `${hrsDisplay} hrs recorded successfully.`,
       type: 'success',
+      undoAction: () => {
+        setTimeEntries(prev => prev.filter(e => e.id !== newEntry.id));
+        api.deleteTimeEntry(newEntry.id).catch(() => {});
+      },
+      undoLabel: 'Undo',
     });
   };
 
   const deleteTimeEntry = (id: string) => {
-    const entry = timeEntries.find(e => e.id === id);
-    if (!entry) return;
     setTimeEntries(prev => prev.filter(e => e.id !== id));
     api.deleteTimeEntry(id).catch(() => {});
     showToast({
-      title: 'Time Log Removed',
-      message: 'Time entry was removed from records.',
+      title: 'Time Entry Deleted',
+      message: 'Log entry removed.',
       type: 'info',
     });
   };
@@ -1047,76 +1023,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInvoices(prev => [newInvoice, ...prev]);
     api.createInvoice(invoiceData).catch(() => {});
 
-    // If paid, add to client total billed
-    if (newInvoice.status === 'paid') {
-      setClients(prev =>
-        prev.map(c =>
-          c.id === newInvoice.clientId ? { ...c, totalBilled: c.totalBilled + newInvoice.total } : c
-        )
-      );
-    }
+    // Update Client's total billed
+    setClients(prev =>
+      prev.map(c =>
+        c.id === newInvoice.clientId
+          ? { ...c, totalBilled: (c.totalBilled || 0) + newInvoice.total }
+          : c
+      )
+    );
 
     showToast({
       title: 'Invoice Created',
-      message: `Invoice ${newInvoice.invoiceNumber} for $${newInvoice.total.toLocaleString()} is ready.`,
+      message: `Invoice #${newInvoice.invoiceNumber} created.`,
       type: 'success',
+      undoAction: () => {
+        setInvoices(prev => prev.filter(i => i.id !== newInvoice.id));
+        api.deleteInvoice(newInvoice.id).catch(() => {});
+      },
+      undoLabel: 'Undo',
     });
     return newInvoice;
   };
 
   const updateInvoice = (id: string, updates: Partial<Invoice>) => {
-    setInvoices(prev => prev.map(inv => (inv.id === id ? { ...inv, ...updates } : inv)));
+    setInvoices(prev => prev.map(i => (i.id === id ? { ...i, ...updates } : i)));
     api.updateInvoice(id, updates).catch(() => {});
     showToast({
-      title: 'Invoice Updated',
-      message: 'Invoice details saved.',
+      title: 'Invoice Saved',
+      message: 'Invoice has been updated.',
       type: 'success',
     });
   };
 
   const deleteInvoice = (id: string) => {
-    const inv = invoices.find(i => i.id === id);
-    if (!inv) return;
     setInvoices(prev => prev.filter(i => i.id !== id));
     api.deleteInvoice(id).catch(() => {});
     showToast({
       title: 'Invoice Deleted',
-      message: `${inv.invoiceNumber} was removed.`,
+      message: 'Invoice removed.',
       type: 'warning',
-      undoAction: () => {
-        setInvoices(prev => [inv, ...prev]);
-        api.createInvoice(inv).catch(() => {});
-      },
-      undoLabel: 'Restore',
     });
   };
 
   const updateInvoiceStatus = (id: string, status: InvoiceStatus) => {
-    const inv = invoices.find(i => i.id === id);
-    if (!inv) return;
-    const oldStatus = inv.status;
     setInvoices(prev => prev.map(i => (i.id === id ? { ...i, status } : i)));
     api.updateInvoice(id, { status }).catch(() => {});
-
-    if (status === 'paid' && oldStatus !== 'paid') {
-      setClients(prev =>
-        prev.map(c => (c.id === inv.clientId ? { ...c, totalBilled: c.totalBilled + inv.total } : c))
-      );
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.6 },
-      });
-    }
-
     showToast({
-      title: `Invoice Marked as ${status.toUpperCase()}`,
-      message: `Status updated for ${inv.invoiceNumber}.`,
-      type: status === 'paid' ? 'success' : 'info',
+      title: 'Status Updated',
+      message: `Invoice marked as ${status.toUpperCase()}.`,
+      type: 'info',
     });
   };
 
-  // Notifications
+  // Notification Actions
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+
   const markNotificationAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
     api.markNotificationRead(id).catch(() => {});
@@ -1124,22 +1085,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const markAllNotificationsAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    showToast({
-      title: 'Notifications Cleared',
-      message: 'All notifications marked as read.',
-      type: 'info',
-    });
   };
 
-  const addNotification = (notifData: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
+  const addNotification = (notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
     const newNotif: AppNotification = {
-      ...notifData,
+      ...notif,
       id: `notif-${Date.now()}`,
-      timestamp: 'Just now',
+      timestamp: new Date().toISOString(),
       read: false,
     };
     setNotifications(prev => [newNotif, ...prev]);
-    if (newNotif.priority === 'urgent' || newNotif.priority === 'high') {
+
+    if (notif.priority === 'urgent' || notif.priority === 'high') {
       playAlertChime();
     }
   };
@@ -1147,13 +1104,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllNotifications = () => {
     setNotifications([]);
     api.clearNotifications().catch(() => {});
+    showToast({
+      title: 'Notifications Cleared',
+      message: 'All notifications cleared.',
+      type: 'info',
+    });
   };
 
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
-
-  // Data Reset & Backup/Restore
+  // Data Reset & Backup
   const resetAllDataToDemo = () => {
-    setUser(initialUser);
+    localStorage.clear();
+    setUser(null);
+    setRegisteredUsers(defaultRegisteredUsers);
     setClients(initialClients);
     setProjects(initialProjects);
     setTasks(initialTasks);
@@ -1161,27 +1123,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInvoices(initialInvoices);
     setNotifications(initialNotifications);
     resetTimer();
-
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.CLIENTS);
-    localStorage.removeItem(STORAGE_KEYS.PROJECTS);
-    localStorage.removeItem(STORAGE_KEYS.TASKS);
-    localStorage.removeItem(STORAGE_KEYS.TIME_ENTRIES);
-    localStorage.removeItem(STORAGE_KEYS.INVOICES);
-    localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_TIMER);
-
     api.resetData().catch(() => {});
-
     showToast({
-      title: 'Reset to Demo Data',
-      message: 'All data has been restored to the initial EC 9540 showcase dataset.',
+      title: 'Demo Data Reset',
+      message: 'All application state restored to default demo state.',
       type: 'info',
     });
   };
 
   const exportDataAsJson = () => {
-    const backup = {
+    const exportObject = {
       version: '1.0',
       exportedAt: new Date().toISOString(),
       user,
@@ -1190,18 +1141,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tasks,
       timeEntries,
       invoices,
+      notifications,
     };
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportObject, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `MePlus_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchor.setAttribute('download', `meplus_freelancer_backup_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
 
     showToast({
-      title: 'Backup Exported',
-      message: 'Your Me Plus workspace was downloaded as a JSON file.',
+      title: 'Backup Downloaded',
+      message: 'Your workspace backup has been exported as JSON.',
       type: 'success',
     });
   };
@@ -1209,15 +1162,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const importDataFromJson = (jsonData: string): boolean => {
     try {
       const parsed = JSON.parse(jsonData);
-      if (parsed.clients) setClients(parsed.clients);
-      if (parsed.projects) setProjects(parsed.projects);
-      if (parsed.tasks) setTasks(parsed.tasks);
-      if (parsed.timeEntries) setTimeEntries(parsed.timeEntries);
-      if (parsed.invoices) setInvoices(parsed.invoices);
       if (parsed.user) setUser(parsed.user);
+      if (Array.isArray(parsed.clients)) setClients(parsed.clients);
+      if (Array.isArray(parsed.projects)) setProjects(parsed.projects);
+      if (Array.isArray(parsed.tasks)) setTasks(parsed.tasks);
+      if (Array.isArray(parsed.timeEntries)) setTimeEntries(parsed.timeEntries);
+      if (Array.isArray(parsed.invoices)) setInvoices(parsed.invoices);
+      if (Array.isArray(parsed.notifications)) setNotifications(parsed.notifications);
 
       showToast({
-        title: 'Workspace Restored',
+        title: 'Data Restored',
         message: 'Successfully imported backup data.',
         type: 'success',
       });
@@ -1243,6 +1197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated: !!user,
         login,
         register,
+        forgotPassword,
+        resetPassword,
         loginDemoUser,
         logout,
         updateUserProfile,
