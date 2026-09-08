@@ -230,6 +230,64 @@ async function runAuthTestSuite() {
     }
   });
 
+  // --- Test 14: Client Persists After Logout & Re-Login ---
+  await test('Verify created client persists across logout & re-login cycles', async () => {
+    const testEmail = `persistent_${Date.now()}@example.com`;
+    const testPassword = 'PersistPassword2026!';
+    
+    // 1. Register user
+    const regRes = await fetch(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Persistent User',
+        email: testEmail,
+        password: testPassword,
+        profession: 'UI/UX Freelancer',
+      }),
+    });
+    if (regRes.status !== 201) throw new Error('Failed to register persistent test user');
+    const regData = await regRes.json();
+    const userId = regData.user.id;
+
+    // 2. Add client for this user
+    const clientRes = await fetch(`${BASE}/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        name: 'Acme Global Corp',
+        company: 'Acme Global',
+        email: 'billing@acmeglobal.com',
+        color: '#128C7E',
+        status: 'active',
+        hourlyRate: 95,
+        currency: '$',
+      }),
+    });
+    if (clientRes.status !== 201) throw new Error('Failed to create client for persistent user');
+
+    // 3. Simulate re-login
+    const loginRes = await fetch(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testEmail, password: testPassword }),
+    });
+    if (loginRes.status !== 200) throw new Error('Re-login failed');
+    const loginData = await loginRes.json();
+
+    // 4. Fetch clients with the re-logged-in user's ID
+    const fetchClientsRes = await fetch(`${BASE}/clients?userId=${loginData.user.id}`);
+    const persistentClients = await fetchClientsRes.json();
+
+    if (!Array.isArray(persistentClients) || persistentClients.length === 0) {
+      throw new Error('Client disappeared after re-login!');
+    }
+    if (persistentClients[0].name !== 'Acme Global Corp') {
+      throw new Error(`Expected client "Acme Global Corp", got "${persistentClients[0]?.name}"`);
+    }
+  });
+
   console.log(`\n${colors.bold}------------------------------------------------------${colors.reset}`);
   console.log(`  ${colors.bold}SUMMARY:${colors.reset} Total: ${passed + failed} | Passed: ${colors.green}${passed}${colors.reset} | Failed: ${colors.red}${failed}${colors.reset}`);
   console.log(`${colors.bold}------------------------------------------------------${colors.reset}\n`);

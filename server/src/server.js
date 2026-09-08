@@ -6,6 +6,7 @@ import {
   getCollection,
   saveCollection,
   resetDbToSeed,
+  getDeterministicUserId,
 } from './db.js';
 
 const app = express();
@@ -25,7 +26,10 @@ app.use((req, res, next) => {
 
 // Helper to get active userId from request
 function getReqUserId(req) {
-  return req.query.userId || req.headers['x-user-id'] || req.body?.userId;
+  const raw = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
+  if (!raw) return 'usr-1';
+  if (raw.includes('@')) return getDeterministicUserId(raw);
+  return raw;
 }
 
 // --- Health Check ---
@@ -60,6 +64,10 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
+  // Normalize deterministic ID
+  const deterministicId = getDeterministicUserId(normalizedEmail);
+  existingUser.id = deterministicId;
+
   // Remove password before sending to client
   const { password: _, ...safeUser } = existingUser;
   db.user = safeUser;
@@ -93,7 +101,7 @@ app.post('/api/auth/register', (req, res) => {
     });
   }
 
-  const newUserId = `usr-${Date.now()}`;
+  const newUserId = getDeterministicUserId(normalizedEmail);
   const newUser = {
     id: newUserId,
     name: name.trim(),
@@ -218,16 +226,21 @@ app.get('/api/clients', (req, res) => {
 
 app.post('/api/clients', (req, res) => {
   const newClientData = req.body;
-  const userId = getReqUserId(req) || 'usr-1';
+  const userId = newClientData.userId || getReqUserId(req) || 'usr-1';
   const clients = getCollection('clients');
   const newClient = {
     ...newClientData,
-    id: `cli-${Date.now()}`,
-    userId: newClientData.userId || userId,
-    totalBilled: 0,
-    createdAt: new Date().toISOString().split('T')[0],
+    id: newClientData.id || `cli-${Date.now()}`,
+    userId: userId,
+    totalBilled: newClientData.totalBilled || 0,
+    createdAt: newClientData.createdAt || new Date().toISOString().split('T')[0],
   };
-  clients.unshift(newClient);
+  const existingIdx = clients.findIndex(c => c.id === newClient.id);
+  if (existingIdx >= 0) {
+    clients[existingIdx] = newClient;
+  } else {
+    clients.unshift(newClient);
+  }
   saveCollection('clients', clients);
   res.status(201).json(newClient);
 });
@@ -261,17 +274,22 @@ app.get('/api/projects', (req, res) => {
 
 app.post('/api/projects', (req, res) => {
   const newProjectData = req.body;
-  const userId = getReqUserId(req) || 'usr-1';
+  const userId = newProjectData.userId || getReqUserId(req) || 'usr-1';
   const projects = getCollection('projects');
   const newProject = {
     ...newProjectData,
-    id: `prj-${Date.now()}`,
-    userId: newProjectData.userId || userId,
-    spent: 0,
-    progress: 0,
-    createdAt: new Date().toISOString().split('T')[0],
+    id: newProjectData.id || `prj-${Date.now()}`,
+    userId: userId,
+    spent: newProjectData.spent || 0,
+    progress: newProjectData.progress || 0,
+    createdAt: newProjectData.createdAt || new Date().toISOString().split('T')[0],
   };
-  projects.unshift(newProject);
+  const existingIdx = projects.findIndex(p => p.id === newProject.id);
+  if (existingIdx >= 0) {
+    projects[existingIdx] = newProject;
+  } else {
+    projects.unshift(newProject);
+  }
   saveCollection('projects', projects);
   res.status(201).json(newProject);
 });
@@ -305,18 +323,23 @@ app.get('/api/tasks', (req, res) => {
 
 app.post('/api/tasks', (req, res) => {
   const newTaskData = req.body;
-  const userId = getReqUserId(req) || 'usr-1';
+  const userId = newTaskData.userId || getReqUserId(req) || 'usr-1';
   const tasks = getCollection('tasks');
   const newTask = {
     ...newTaskData,
-    id: `tsk-${Date.now()}`,
-    userId: newTaskData.userId || userId,
-    actualHours: 0,
+    id: newTaskData.id || `tsk-${Date.now()}`,
+    userId: userId,
+    actualHours: newTaskData.actualHours || 0,
     subtasks: newTaskData.subtasks || [],
     attachments: newTaskData.attachments || [],
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: newTaskData.createdAt || new Date().toISOString().split('T')[0],
   };
-  tasks.unshift(newTask);
+  const existingIdx = tasks.findIndex(t => t.id === newTask.id);
+  if (existingIdx >= 0) {
+    tasks[existingIdx] = newTask;
+  } else {
+    tasks.unshift(newTask);
+  }
   saveCollection('tasks', tasks);
   res.status(201).json(newTask);
 });
@@ -350,15 +373,20 @@ app.get('/api/time-entries', (req, res) => {
 
 app.post('/api/time-entries', (req, res) => {
   const newEntryData = req.body;
-  const userId = getReqUserId(req) || 'usr-1';
+  const userId = newEntryData.userId || getReqUserId(req) || 'usr-1';
   const timeEntries = getCollection('timeEntries');
   const newEntry = {
     ...newEntryData,
-    id: `time-${Date.now()}`,
-    userId: newEntryData.userId || userId,
+    id: newEntryData.id || `time-${Date.now()}`,
+    userId: userId,
     date: newEntryData.date || new Date().toISOString().split('T')[0],
   };
-  timeEntries.unshift(newEntry);
+  const existingIdx = timeEntries.findIndex(t => t.id === newEntry.id);
+  if (existingIdx >= 0) {
+    timeEntries[existingIdx] = newEntry;
+  } else {
+    timeEntries.unshift(newEntry);
+  }
   saveCollection('timeEntries', timeEntries);
   res.status(201).json(newEntry);
 });
@@ -380,15 +408,20 @@ app.get('/api/invoices', (req, res) => {
 
 app.post('/api/invoices', (req, res) => {
   const newInvoiceData = req.body;
-  const userId = getReqUserId(req) || 'usr-1';
+  const userId = newInvoiceData.userId || getReqUserId(req) || 'usr-1';
   const invoices = getCollection('invoices');
   const newInvoice = {
     ...newInvoiceData,
-    id: `inv-${Date.now()}`,
-    userId: newInvoiceData.userId || userId,
-    createdAt: new Date().toISOString().split('T')[0],
+    id: newInvoiceData.id || `inv-${Date.now()}`,
+    userId: userId,
+    createdAt: newInvoiceData.createdAt || new Date().toISOString().split('T')[0],
   };
-  invoices.unshift(newInvoice);
+  const existingIdx = invoices.findIndex(i => i.id === newInvoice.id);
+  if (existingIdx >= 0) {
+    invoices[existingIdx] = newInvoice;
+  } else {
+    invoices.unshift(newInvoice);
+  }
   saveCollection('invoices', invoices);
   res.status(201).json(newInvoice);
 });

@@ -349,6 +349,15 @@ export const initialSeed = {
   ],
 };
 
+// Deterministic user ID generator based on email
+export const getDeterministicUserId = (email) => {
+  const norm = (email || '').trim().toLowerCase();
+  if (!norm) return 'usr-1';
+  if (norm === 'demo@meplus.io' || norm === 'usr-demo') return 'usr-demo';
+  if (norm === 'alex.rivera@gmail.com' || norm === 'usr-1') return 'usr-1';
+  return `usr_${norm.replace(/[^a-z0-9]/g, '_')}`;
+};
+
 // Initialize DB file if not exists
 export const initDb = () => {
   if (!fs.existsSync(DATA_DIR)) {
@@ -405,3 +414,4 @@ export const resetDbToSeed = () => {
   writeDb(initialSeed);
   return initialSeed;
 };
+

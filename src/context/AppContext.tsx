@@ -164,6 +164,14 @@ interface RegisteredAccount {
   bio?: string;
 }
 
+export function getDeterministicUserId(email: string): string {
+  const norm = (email || '').trim().toLowerCase();
+  if (!norm) return 'usr-1';
+  if (norm === 'demo@meplus.io' || norm === 'usr-demo') return 'usr-demo';
+  if (norm === 'alex.rivera@gmail.com' || norm === 'usr-1') return 'usr-1';
+  return `usr_${norm.replace(/[^a-z0-9]/g, '_')}`;
+}
+
 const defaultRegisteredUsers: RegisteredAccount[] = [
   {
     id: 'usr-1',
@@ -205,6 +213,42 @@ function safeGetStorage<T>(key: string, fallback: T): T {
   }
 }
 
+function getSavedUserDataWithMigration<T>(prefix: string, currentUser: UserProfile | null, fallback: T): T {
+  if (!currentUser) return fallback;
+  const directKey = `${prefix}${currentUser.id}`;
+  const directSaved = localStorage.getItem(directKey);
+  if (directSaved) {
+    try {
+      const parsed = JSON.parse(directSaved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as T;
+      if (!Array.isArray(parsed) && parsed) return parsed as T;
+    } catch {
+      // continue to legacy check
+    }
+  }
+
+  // Scan localStorage for any legacy key belonging to this user
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix) && key !== directKey) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localStorage.setItem(directKey, val);
+            return parsed as T;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return fallback;
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -217,7 +261,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User & Auth State
   const [user, setUser] = useState<UserProfile | null>(() => {
-    return safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    const u = safeGetStorage<UserProfile | null>(STORAGE_KEYS.USER, null);
+    if (u && u.email) {
+      return { ...u, id: getDeterministicUserId(u.email) };
+    }
+    return u;
   });
 
   // Per-User Collections Initializers
@@ -227,7 +275,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<Client[]>(`${STORAGE_KEYS.CLIENTS_PREFIX}${initial.id}`, initialClients);
     }
-    return safeGetStorage<Client[]>(`${STORAGE_KEYS.CLIENTS_PREFIX}${initial.id}`, []);
+    return getSavedUserDataWithMigration<Client[]>(STORAGE_KEYS.CLIENTS_PREFIX, initial, []);
   });
 
   const [projects, setProjects] = useState<Project[]>(() => {
@@ -236,7 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<Project[]>(`${STORAGE_KEYS.PROJECTS_PREFIX}${initial.id}`, initialProjects);
     }
-    return safeGetStorage<Project[]>(`${STORAGE_KEYS.PROJECTS_PREFIX}${initial.id}`, []);
+    return getSavedUserDataWithMigration<Project[]>(STORAGE_KEYS.PROJECTS_PREFIX, initial, []);
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -245,7 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<Task[]>(`${STORAGE_KEYS.TASKS_PREFIX}${initial.id}`, initialTasks);
     }
-    return safeGetStorage<Task[]>(`${STORAGE_KEYS.TASKS_PREFIX}${initial.id}`, []);
+    return getSavedUserDataWithMigration<Task[]>(STORAGE_KEYS.TASKS_PREFIX, initial, []);
   });
 
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(() => {
@@ -254,7 +302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<TimeEntry[]>(`${STORAGE_KEYS.TIME_PREFIX}${initial.id}`, initialTimeEntries);
     }
-    return safeGetStorage<TimeEntry[]>(`${STORAGE_KEYS.TIME_PREFIX}${initial.id}`, []);
+    return getSavedUserDataWithMigration<TimeEntry[]>(STORAGE_KEYS.TIME_PREFIX, initial, []);
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
@@ -263,7 +311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<Invoice[]>(`${STORAGE_KEYS.INVOICES_PREFIX}${initial.id}`, initialInvoices);
     }
-    return safeGetStorage<Invoice[]>(`${STORAGE_KEYS.INVOICES_PREFIX}${initial.id}`, []);
+    return getSavedUserDataWithMigration<Invoice[]>(STORAGE_KEYS.INVOICES_PREFIX, initial, []);
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -272,7 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isDemoAccount(initial)) {
       return safeGetStorage<AppNotification[]>(`${STORAGE_KEYS.NOTIFS_PREFIX}${initial.id}`, initialNotifications);
     }
-    return safeGetStorage<AppNotification[]>(`${STORAGE_KEYS.NOTIFS_PREFIX}${initial.id}`, [
+    const defaultWelcomeNotif: AppNotification[] = [
       {
         id: `notif-welcome-${initial.id}`,
         userId: initial.id,
@@ -283,7 +331,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp: 'Just now',
         read: false,
       },
-    ]);
+    ];
+    return getSavedUserDataWithMigration<AppNotification[]>(STORAGE_KEYS.NOTIFS_PREFIX, initial, defaultWelcomeNotif);
   });
 
   // Active Stopwatch Timer
@@ -330,24 +379,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isDemo = isDemoAccount(currentUser);
 
     // Initial local storage read for immediate rendering
-    const localClients = safeGetStorage<Client[]>(
-      `${STORAGE_KEYS.CLIENTS_PREFIX}${currentUser.id}`,
+    const localClients = getSavedUserDataWithMigration<Client[]>(
+      STORAGE_KEYS.CLIENTS_PREFIX,
+      currentUser,
       isDemo ? initialClients : []
     );
-    const localProjects = safeGetStorage<Project[]>(
-      `${STORAGE_KEYS.PROJECTS_PREFIX}${currentUser.id}`,
+    const localProjects = getSavedUserDataWithMigration<Project[]>(
+      STORAGE_KEYS.PROJECTS_PREFIX,
+      currentUser,
       isDemo ? initialProjects : []
     );
-    const localTasks = safeGetStorage<Task[]>(
-      `${STORAGE_KEYS.TASKS_PREFIX}${currentUser.id}`,
+    const localTasks = getSavedUserDataWithMigration<Task[]>(
+      STORAGE_KEYS.TASKS_PREFIX,
+      currentUser,
       isDemo ? initialTasks : []
     );
-    const localTime = safeGetStorage<TimeEntry[]>(
-      `${STORAGE_KEYS.TIME_PREFIX}${currentUser.id}`,
+    const localTime = getSavedUserDataWithMigration<TimeEntry[]>(
+      STORAGE_KEYS.TIME_PREFIX,
+      currentUser,
       isDemo ? initialTimeEntries : []
     );
-    const localInvoices = safeGetStorage<Invoice[]>(
-      `${STORAGE_KEYS.INVOICES_PREFIX}${currentUser.id}`,
+    const localInvoices = getSavedUserDataWithMigration<Invoice[]>(
+      STORAGE_KEYS.INVOICES_PREFIX,
+      currentUser,
       isDemo ? initialInvoices : []
     );
     const defaultWelcomeNotif: AppNotification[] = [
@@ -362,8 +416,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         read: false,
       },
     ];
-    const localNotifs = safeGetStorage<AppNotification[]>(
-      `${STORAGE_KEYS.NOTIFS_PREFIX}${currentUser.id}`,
+    const localNotifs = getSavedUserDataWithMigration<AppNotification[]>(
+      STORAGE_KEYS.NOTIFS_PREFIX,
+      currentUser,
       isDemo ? initialNotifications : defaultWelcomeNotif
     );
 
@@ -374,7 +429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInvoices(localInvoices);
     setNotifications(localNotifs);
 
-    // Sync from Backend REST API for this specific user
+    // Sync from Backend REST API for this specific user with Two-Way Merge
     Promise.all([
       api.getClients(currentUser.id).catch(() => null),
       api.getProjects(currentUser.id).catch(() => null),
@@ -383,11 +438,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.getInvoices(currentUser.id).catch(() => null),
       api.getNotifications(currentUser.id).catch(() => null),
     ]).then(([apiClients, apiProjects, apiTasks, apiTime, apiInvoices, apiNotifs]) => {
-      if (apiClients !== null) setClients(apiClients);
-      if (apiProjects !== null) setProjects(apiProjects);
-      if (apiTasks !== null) setTasks(apiTasks);
-      if (apiTime !== null) setTimeEntries(apiTime);
-      if (apiInvoices !== null) setInvoices(apiInvoices);
+      if (apiClients !== null) {
+        setClients(prev => {
+          const map = new Map<string, Client>();
+          prev.forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          apiClients.forEach(c => map.set(c.id, { ...c, userId: currentUser.id }));
+          const merged = Array.from(map.values());
+          // Sync local-only items to backend
+          prev.forEach(item => {
+            if (!apiClients.some(ac => ac.id === item.id)) {
+              api.createClient({ ...item, userId: currentUser.id }).catch(() => {});
+            }
+          });
+          return merged;
+        });
+      }
+      if (apiProjects !== null) {
+        setProjects(prev => {
+          const map = new Map<string, Project>();
+          prev.forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          apiProjects.forEach(p => map.set(p.id, { ...p, userId: currentUser.id }));
+          const merged = Array.from(map.values());
+          prev.forEach(item => {
+            if (!apiProjects.some(ap => ap.id === item.id)) {
+              api.createProject({ ...item, userId: currentUser.id }).catch(() => {});
+            }
+          });
+          return merged;
+        });
+      }
+      if (apiTasks !== null) {
+        setTasks(prev => {
+          const map = new Map<string, Task>();
+          prev.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTasks.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          const merged = Array.from(map.values());
+          prev.forEach(item => {
+            if (!apiTasks.some(at => at.id === item.id)) {
+              api.createTask({ ...item, userId: currentUser.id }).catch(() => {});
+            }
+          });
+          return merged;
+        });
+      }
+      if (apiTime !== null) {
+        setTimeEntries(prev => {
+          const map = new Map<string, TimeEntry>();
+          prev.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          apiTime.forEach(t => map.set(t.id, { ...t, userId: currentUser.id }));
+          const merged = Array.from(map.values());
+          prev.forEach(item => {
+            if (!apiTime.some(at => at.id === item.id)) {
+              api.createTimeEntry({ ...item, userId: currentUser.id }).catch(() => {});
+            }
+          });
+          return merged;
+        });
+      }
+      if (apiInvoices !== null) {
+        setInvoices(prev => {
+          const map = new Map<string, Invoice>();
+          prev.forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          apiInvoices.forEach(i => map.set(i.id, { ...i, userId: currentUser.id }));
+          const merged = Array.from(map.values());
+          prev.forEach(item => {
+            if (!apiInvoices.some(ai => ai.id === item.id)) {
+              api.createInvoice({ ...item, userId: currentUser.id }).catch(() => {});
+            }
+          });
+          return merged;
+        });
+      }
       if (apiNotifs !== null) {
         if (apiNotifs.length > 0) setNotifications(apiNotifs);
         else if (!isDemo) setNotifications(defaultWelcomeNotif);
@@ -532,18 +653,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Please enter your password.' };
     }
 
+    const deterministicId = getDeterministicUserId(normalizedEmail);
+
     // 1. Try backend REST API first
     try {
       const res = await api.login(normalizedEmail, password);
       if (res && res.user) {
-        setUser(res.user);
+        const authenticatedUser: UserProfile = {
+          ...res.user,
+          id: deterministicId,
+        };
+        setUser(authenticatedUser);
         // Ensure user is synced in registeredUsers local directory as well
         setRegisteredUsers(prev => {
           if (!prev.some(u => u.email.toLowerCase() === normalizedEmail)) {
             return [
               ...prev,
               {
-                id: res.user.id,
+                id: deterministicId,
                 name: res.user.name,
                 email: normalizedEmail,
                 password,
@@ -551,7 +678,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               },
             ];
           }
-          return prev;
+          return prev.map(u => (u.email.toLowerCase() === normalizedEmail ? { ...u, id: deterministicId } : u));
         });
         showToast({
           title: 'Welcome back!',
@@ -588,7 +715,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     api.register(matched.name, matched.email, password, matched.title).catch(() => {});
 
     const authenticatedUser: UserProfile = {
-      id: matched.id,
+      id: deterministicId,
       name: matched.name,
       email: matched.email,
       avatar: matched.avatar || initialUser.avatar,
@@ -628,15 +755,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Password must be at least 6 characters long.' };
     }
 
+    const deterministicId = getDeterministicUserId(normalizedEmail);
+
     // 1. Try backend REST API
     try {
       const res = await api.register(name.trim(), normalizedEmail, password, profession);
       if (res && res.user) {
-        setUser(res.user);
+        const authenticatedUser: UserProfile = {
+          ...res.user,
+          id: deterministicId,
+        };
+        setUser(authenticatedUser);
         setRegisteredUsers(prev => [
           ...prev.filter(u => u.email.toLowerCase() !== normalizedEmail),
           {
-            id: res.user.id,
+            id: deterministicId,
             name: res.user.name,
             email: normalizedEmail,
             password,
@@ -667,7 +800,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Local client registration fallback (e.g. for static/Vercel environments)
     const newUserAccount: RegisteredAccount = {
-      id: `usr-${Date.now()}`,
+      id: deterministicId,
       name: name.trim(),
       email: normalizedEmail,
       password,
@@ -678,7 +811,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRegisteredUsers(prev => [...prev, newUserAccount]);
 
     const newUserProfile: UserProfile = {
-      id: newUserAccount.id,
+      id: deterministicId,
       name: newUserAccount.name,
       email: newUserAccount.email,
       avatar: initialUser.avatar,
@@ -773,6 +906,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
+    if (user) {
+      try {
+        localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(clients));
+        localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`, JSON.stringify(projects));
+        localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(tasks));
+        localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`, JSON.stringify(timeEntries));
+        localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`, JSON.stringify(invoices));
+        localStorage.setItem(`${STORAGE_KEYS.NOTIFS_PREFIX}${user.id}`, JSON.stringify(notifications));
+      } catch (e) {
+        console.warn('Error saving data on logout', e);
+      }
+    }
     resetTimer();
     setUser(null);
     showToast({
@@ -794,14 +939,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Client Actions
   const addClient = (newClientData: Omit<Client, 'id' | 'createdAt' | 'totalBilled'>) => {
+    const activeUserId = user?.id || (user?.email ? getDeterministicUserId(user.email) : 'usr-1');
     const newClient: Client = {
       ...newClientData,
       id: `cli-${Date.now()}`,
-      userId: user?.id || 'usr-1',
+      userId: activeUserId,
       createdAt: new Date().toISOString().split('T')[0],
       totalBilled: 0,
     };
-    setClients(prev => [newClient, ...prev]);
+    setClients(prev => {
+      const next = [newClient, ...prev];
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
     api.createClient(newClient).catch(() => {});
     showToast({
       title: 'Client Added',
@@ -864,15 +1016,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addProject = (projectData: Omit<Project, 'id' | 'createdAt' | 'spent' | 'progress'>) => {
+    const activeUserId = user?.id || (user?.email ? getDeterministicUserId(user.email) : 'usr-1');
     const newProject: Project = {
       ...projectData,
       id: `prj-${Date.now()}`,
-      userId: user?.id || 'usr-1',
+      userId: activeUserId,
       spent: 0,
       progress: 0,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setProjects(prev => [newProject, ...prev]);
+    setProjects(prev => {
+      const next = [newProject, ...prev];
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.PROJECTS_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
     api.createProject(newProject).catch(() => {});
     showToast({
       title: 'Project Created',
@@ -943,16 +1102,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Task Actions
   const addTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'actualHours'>) => {
+    const activeUserId = user?.id || (user?.email ? getDeterministicUserId(user.email) : 'usr-1');
     const newTask: Task = {
       ...taskData,
       id: `tsk-${Date.now()}`,
-      userId: user?.id || 'usr-1',
+      userId: activeUserId,
       actualHours: 0,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    const updatedTasks = [newTask, ...tasks];
-    setTasks(updatedTasks);
-    recalculateProjectProgress(newTask.projectId, updatedTasks);
+    setTasks(prev => {
+      const next = [newTask, ...prev];
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      recalculateProjectProgress(newTask.projectId, next);
+      return next;
+    });
     api.createTask(newTask).catch(() => {});
 
     showToast({
@@ -1118,24 +1283,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addTimeEntry = (entryData: Omit<TimeEntry, 'id'>) => {
+    const activeUserId = user?.id || (user?.email ? getDeterministicUserId(user.email) : 'usr-1');
     const newEntry: TimeEntry = {
       ...entryData,
       id: `time-${Date.now()}`,
-      userId: user?.id || 'usr-1',
+      userId: activeUserId,
     };
-    setTimeEntries(prev => [newEntry, ...prev]);
+    setTimeEntries(prev => {
+      const next = [newEntry, ...prev];
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.TIME_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
     api.createTimeEntry(newEntry).catch(() => {});
 
     // Also update actual hours on task if specified
     if (newEntry.taskId) {
       const addedHours = Number((newEntry.durationSeconds / 3600).toFixed(2));
-      setTasks(prev =>
-        prev.map(t =>
+      setTasks(prev => {
+        const next = prev.map(t =>
           t.id === newEntry.taskId
             ? { ...t, actualHours: Number(((t.actualHours || 0) + addedHours).toFixed(2)) }
             : t
-        )
-      );
+        );
+        if (user) {
+          localStorage.setItem(`${STORAGE_KEYS.TASKS_PREFIX}${user.id}`, JSON.stringify(next));
+        }
+        return next;
+      });
     }
 
     const hrsDisplay = (newEntry.durationSeconds / 3600).toFixed(1);
@@ -1163,23 +1339,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Invoice Actions
   const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
+    const activeUserId = user?.id || (user?.email ? getDeterministicUserId(user.email) : 'usr-1');
     const newInvoice: Invoice = {
       ...invoiceData,
       id: `inv-${Date.now()}`,
-      userId: user?.id || 'usr-1',
+      userId: activeUserId,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setInvoices(prev => [newInvoice, ...prev]);
+    setInvoices(prev => {
+      const next = [newInvoice, ...prev];
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.INVOICES_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
     api.createInvoice(newInvoice).catch(() => {});
 
     // Update Client's total billed
-    setClients(prev =>
-      prev.map(c =>
+    setClients(prev => {
+      const next = prev.map(c =>
         c.id === newInvoice.clientId
           ? { ...c, totalBilled: (c.totalBilled || 0) + newInvoice.total }
           : c
-      )
-    );
+      );
+      if (user) {
+        localStorage.setItem(`${STORAGE_KEYS.CLIENTS_PREFIX}${user.id}`, JSON.stringify(next));
+      }
+      return next;
+    });
 
     showToast({
       title: 'Invoice Created',
