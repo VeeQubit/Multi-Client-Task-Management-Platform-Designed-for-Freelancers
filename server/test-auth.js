@@ -62,6 +62,20 @@ async function runAuthTestSuite() {
     }
   });
 
+  // --- Test 2b: Missing Password Rejection ---
+  await test('Reject login with missing password parameter (Expects 400 Bad Request)', async () => {
+    const res = await fetch(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'alex.rivera@gmail.com' }),
+    });
+    if (res.status !== 400) throw new Error(`Expected HTTP 400, got ${res.status}`);
+    const data = await res.json();
+    if (!data.error || !data.error.includes('Password is required')) {
+      throw new Error(`Unexpected error message: ${data.error}`);
+    }
+  });
+
   // --- Test 3: Valid Credentials Login ---
   await test('Allow login with correct credentials (alex.rivera@gmail.com)', async () => {
     const res = await fetch(`${BASE}/auth/login`, {

@@ -1409,6 +1409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: deterministicId,
         };
         setUser(authenticatedUser);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authenticatedUser));
         setRegisteredUsers(prev => [
           ...prev.filter(u => u.email.toLowerCase() !== normalizedEmail),
           {
@@ -1483,6 +1484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setUser(newUserProfile);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUserProfile));
     showToast({
       title: 'Account Verified & Created!',
       message: `Welcome to Me Plus, ${name}! Your fresh workspace is ready.`,

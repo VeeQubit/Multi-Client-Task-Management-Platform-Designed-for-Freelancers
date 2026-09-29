@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import {
   initDatabase,
   isMongoActive,
@@ -93,11 +94,29 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Safe constant-time password comparison
+function safePasswordCompare(provided, stored) {
+  if (typeof provided !== 'string' || typeof stored !== 'string') return false;
+  if (!provided || !stored) return false;
+  const bufA = Buffer.from(provided);
+  const bufB = Buffer.from(stored);
+  if (bufA.length !== bufB.length) return false;
+  try {
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
 // --- Auth Endpoints ---
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'Email address is required' });
+  }
+
+  if (!password || typeof password !== 'string' || !password.trim()) {
+    return res.status(400).json({ error: 'Password is required' });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -109,8 +128,9 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // If password provided, verify password
-  if (password && existingUser.password && existingUser.password !== password) {
+  // Strict Password Verification
+  const storedPassword = existingUser.password || '';
+  if (!safePasswordCompare(password, storedPassword)) {
     return res.status(401).json({
       error: 'Invalid credentials: The password you entered is incorrect. Please check and try again.',
     });
@@ -159,12 +179,16 @@ app.post('/api/auth/send-registration-otp', async (req, res) => {
       type: 'registration',
     });
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const previewPayload = !isProd ? { otpPreview: otp } : {};
+
     return res.json({
       success: true,
       message: `A 6-digit verification code has been sent to ${normalizedEmail}. Please check your email inbox and spam folder.`,
       email: normalizedEmail,
       isRealEmail: emailResult.isRealEmail,
       expiresInSeconds: 600,
+      ...previewPayload,
     });
   } catch (err) {
     console.error('❌ Failed to deliver registration OTP email:', err);
@@ -279,6 +303,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       userName: user.name,
     });
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const previewPayload = !isProd ? { otpPreview: otp } : {};
+
     if (emailResult.isRealEmail) {
       return res.json({
         success: true,
@@ -286,6 +313,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         email: normalizedEmail,
         isRealEmail: true,
         expiresInSeconds: 600,
+        ...previewPayload,
       });
     }
 
@@ -301,6 +329,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       email: normalizedEmail,
       isRealEmail: false,
       expiresInSeconds: 600,
+      ...previewPayload,
     });
   } catch (err) {
     console.error('❌ Failed to deliver OTP email:', err);
@@ -362,6 +391,9 @@ app.post('/api/auth/resend-otp', async (req, res) => {
       userName: user.name,
     });
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const previewPayload = !isProd ? { otpPreview: otp } : {};
+
     if (emailResult.isRealEmail) {
       return res.json({
         success: true,
@@ -369,6 +401,7 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         email: normalizedEmail,
         isRealEmail: true,
         expiresInSeconds: 600,
+        ...previewPayload,
       });
     }
 
@@ -384,6 +417,7 @@ app.post('/api/auth/resend-otp', async (req, res) => {
       email: normalizedEmail,
       isRealEmail: false,
       expiresInSeconds: 600,
+      ...previewPayload,
     });
   } catch (err) {
     console.error('❌ Failed to resend OTP email:', err);
