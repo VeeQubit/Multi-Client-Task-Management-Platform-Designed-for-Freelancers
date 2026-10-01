@@ -112,6 +112,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setSuccessMessage('');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setRegisterStep('form');
     setRegisterOtp('');
     setRegisterOtpPreview('');
@@ -124,8 +126,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setIsResending(false);
     setNewPassword('');
     setConfirmNewPassword('');
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
     setForgotStep('email');
     setIsLoading(false);
+
+    // Clean slate for Create Account form: clear previous email and name so only placeholder displays
+    if (newMode === 'register') {
+      setEmail('');
+      setName('');
+      setCustomProfession('');
+    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -604,6 +615,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="name123@gmail.com"
+                  autoComplete="off"
                   className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs md:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   required
                   disabled={isLoading}
@@ -622,6 +634,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   className="w-full pl-9 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs md:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   required
                   disabled={isLoading}
@@ -648,6 +661,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   className={`w-full pl-9 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800/60 border rounded-xl text-xs md:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
                     confirmPassword && confirmPassword !== password
                       ? 'border-rose-400 focus:ring-rose-400'

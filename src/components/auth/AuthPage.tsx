@@ -114,8 +114,12 @@ export const AuthPage: React.FC = () => {
     setSuccessMessage('');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setNewPassword('');
     setConfirmNewPassword('');
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
     setOtp('');
     setOtpPreview('');
     setResetToken('');
@@ -126,6 +130,13 @@ export const AuthPage: React.FC = () => {
     setRegisterOtpPreview('');
     setRegisterResendCooldown(0);
     setIsLoading(false);
+
+    // Clean slate for Create Account form: clear previous email and name so only placeholder displays
+    if (newMode === 'register') {
+      setEmail('');
+      setName('');
+      setCustomProfession('');
+    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -425,9 +436,7 @@ export const AuthPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setMode(mode === 'login' ? 'register' : 'login');
-              setError('');
-              setSuccessMessage('');
+              resetAllFormStates(mode === 'login' ? 'register' : 'login');
             }}
             className="w-32 shrink-0 flex items-center justify-center text-center whitespace-nowrap text-xs font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 py-1.5 rounded-full bg-emerald-50/80 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 transition-colors cursor-pointer"
           >
@@ -814,6 +823,7 @@ export const AuthPage: React.FC = () => {
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="name123@gmail.com"
+                        autoComplete="off"
                         className="w-full pl-9 pr-3.5 py-2 sm:py-2.5 bg-[#f0f4fa] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
                         required
                         disabled={isLoading}
@@ -835,6 +845,7 @@ export const AuthPage: React.FC = () => {
                           value={password}
                           onChange={e => setPassword(e.target.value)}
                           placeholder="••••••••"
+                          autoComplete="new-password"
                           className="w-full pl-9 pr-10 py-2 sm:py-2.5 bg-[#f0f4fa] dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
                           required
                           disabled={isLoading}
@@ -862,6 +873,7 @@ export const AuthPage: React.FC = () => {
                           value={confirmPassword}
                           onChange={e => setConfirmPassword(e.target.value)}
                           placeholder="••••••••"
+                          autoComplete="new-password"
                           className={`w-full pl-9 pr-10 py-2 sm:py-2.5 bg-[#f0f4fa] dark:bg-slate-800/80 border rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
                             confirmPassword && confirmPassword !== password
                               ? 'border-rose-400 focus:ring-rose-400'

@@ -13,6 +13,19 @@
     border-color: theme('colors.slate.800');
   }
 
+  /* Disable browser native password reveal & clear buttons to eliminate duplicate eye icons (Edge/IE) */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear,
+  input::-ms-reveal,
+  input::-ms-clear,
+  ::-ms-reveal,
+  ::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+  }
+
   /* Default Emerald Green Accent */
   :root,
   :root[data-accent-color="emerald"] {
@@ -274,6 +287,14 @@
 
 .animate-border-beam {
   animation: borderBeamRotate 3.5s linear infinite;
+}
+
+/* Global suppression of Microsoft Edge / IE password reveal icons */
+::-ms-reveal,
+::-ms-clear,
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
 }
 
 
